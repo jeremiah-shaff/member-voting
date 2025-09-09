@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiRequest } from '../api';
+import { apiRequest } from '../api.jsx';
 
 export default function CreateBallotPage() {
   const [title, setTitle] = useState('');
@@ -8,7 +8,7 @@ export default function CreateBallotPage() {
   const [endTime, setEndTime] = useState('');
   const [quorum, setQuorum] = useState(0);
   const [acceptanceThreshold, setAcceptanceThreshold] = useState(50);
-  const [measures, setMeasures] = useState(['']);
+  const [measures, setMeasures] = useState([{ title: '', description: '' }]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -16,7 +16,7 @@ export default function CreateBallotPage() {
     setMeasures(m => m.map((v, i) => i === idx ? value : v));
   };
 
-  const addMeasure = () => setMeasures([...measures, '']);
+  const addMeasure = () => setMeasures([...measures, { title: '', description: '' }]);
   const removeMeasure = idx => setMeasures(measures.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e) => {
@@ -29,7 +29,7 @@ export default function CreateBallotPage() {
       end_time: endTime,
       quorum: Number(quorum),
       acceptance_threshold: Number(acceptanceThreshold),
-      measures: measures.filter(m => m.trim())
+      measures: measures.filter(m => m.title && m.title.trim()).map(m => `${m.title}||${m.description || ''}`)
     }, token);
     if (res.ballot_id) {
       setSuccess('Ballot created!');
@@ -44,16 +44,33 @@ export default function CreateBallotPage() {
     <div>
       <h2>Create Ballot</h2>
       <form onSubmit={handleSubmit}>
-        <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
-        <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} />
-        <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
-        <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
-        <input type="number" placeholder="Quorum" value={quorum} onChange={e => setQuorum(e.target.value)} />
-        <input type="number" placeholder="Acceptance Threshold (%)" value={acceptanceThreshold} onChange={e => setAcceptanceThreshold(e.target.value)} />
-        <h4>Measures</h4>
+        <label>Ballot Title<br />
+          <input placeholder="Title of the ballot (e.g. Board Elections)" value={title} onChange={e => setTitle(e.target.value)} />
+        </label><br />
+        <label>Ballot Description<br />
+          <textarea placeholder="Describe the purpose or context of this ballot" value={description} onChange={e => setDescription(e.target.value)} />
+        </label><br />
+        <label>Voting Start Time<br />
+          <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
+        </label><br />
+        <label>Voting End Time<br />
+          <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
+        </label><br />
+        <label>Quorum<br />
+          <input type="number" placeholder="Minimum number of votes required" value={quorum} onChange={e => setQuorum(e.target.value)} />
+        </label><br />
+        <label>Acceptance Threshold (%)<br />
+          <input type="number" placeholder="Percentage of 'Yes' votes required to pass" value={acceptanceThreshold} onChange={e => setAcceptanceThreshold(e.target.value)} />
+        </label><br />
+        <h4>Ballot Measures</h4>
         {measures.map((m, idx) => (
-          <div key={idx}>
-            <input value={m} onChange={e => handleMeasureChange(idx, e.target.value)} placeholder={`Measure ${idx+1}`} />
+          <div key={idx} style={{marginBottom: '10px'}}>
+            <label>Measure Title<br />
+              <input value={m.title} onChange={e => handleMeasureChange(idx, { ...m, title: e.target.value })} placeholder={`Measure ${idx+1} title`} />
+            </label><br />
+            <label>Measure Description<br />
+              <textarea value={m.description} onChange={e => handleMeasureChange(idx, { ...m, description: e.target.value })} placeholder={`Describe measure ${idx+1}`} />
+            </label><br />
             <button type="button" onClick={() => removeMeasure(idx)} disabled={measures.length === 1}>Remove</button>
           </div>
         ))}

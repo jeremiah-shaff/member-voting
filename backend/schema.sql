@@ -24,7 +24,8 @@ CREATE TABLE ballots (
 CREATE TABLE ballot_measures (
     id SERIAL PRIMARY KEY,
     ballot_id INTEGER REFERENCES ballots(id) ON DELETE CASCADE,
-    measure_text TEXT NOT NULL
+    measure_text TEXT NOT NULL,
+    measure_description TEXT
 );
 
 -- Votes table

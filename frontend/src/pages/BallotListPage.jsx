@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiRequest } from '../api';
+import { apiRequest } from '../api.jsx';
 
 export default function BallotListPage() {
   const [ballots, setBallots] = useState([]);

@@ -19,6 +19,7 @@ router.post('/auth/register', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    console.error(err);
     if (err.code === '23505') {
       res.status(409).json({ error: 'Username already exists' });
     } else {
@@ -64,10 +65,15 @@ router.post('/ballots', authenticateToken, requireAdmin, async (req, res) => {
       [title, description || '', start_time, end_time, quorum || 0, acceptance_threshold || 50, req.user.id]
     );
     const ballotId = ballotResult.rows[0].id;
-    // Insert measures
-    const measurePromises = measures.map(measure =>
-      pool.query('INSERT INTO ballot_measures (ballot_id, measure_text) VALUES ($1, $2) RETURNING id, measure_text', [ballotId, measure])
-    );
+    // Insert measures (support title||description format)
+    const measurePromises = measures.map(measure => {
+      let title = measure;
+      let desc = '';
+      if (typeof measure === 'string' && measure.includes('||')) {
+        [title, desc] = measure.split('||');
+      }
+      return pool.query('INSERT INTO ballot_measures (ballot_id, measure_text, measure_description) VALUES ($1, $2, $3) RETURNING id, measure_text, measure_description', [ballotId, title, desc]);
+    });
     const measureResults = await Promise.all(measurePromises);
     const insertedMeasures = measureResults.map(r => r.rows[0]);
     res.status(201).json({ ballot_id: ballotId, measures: insertedMeasures });
@@ -104,7 +110,7 @@ router.get('/ballots/:id', authenticateToken, async (req, res) => {
     );
     if (ballotResult.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
     const measuresResult = await pool.query(
-      'SELECT id, measure_text FROM ballot_measures WHERE ballot_id = $1',
+      'SELECT id, measure_text, measure_description FROM ballot_measures WHERE ballot_id = $1',
       [ballotId]
     );
     const ballot = ballotResult.rows[0];
@@ -115,7 +121,36 @@ router.get('/ballots/:id', authenticateToken, async (req, res) => {
   }
 });
 router.put('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => {
-  // Admin: update ballot
+  const ballotId = req.params.id;
+  const { title, description, start_time, end_time, quorum, acceptance_threshold, measures } = req.body;
+  try {
+    const pool = req.pool;
+    const result = await pool.query(
+      'UPDATE ballots SET title = $1, description = $2, start_time = $3, end_time = $4, quorum = $5, acceptance_threshold = $6 WHERE id = $7 RETURNING *',
+      [title, description, start_time, end_time, quorum, acceptance_threshold, ballotId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
+
+    // If measures are provided, update them
+    if (Array.isArray(measures)) {
+      // Remove existing measures for this ballot
+      await pool.query('DELETE FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
+      // Insert new measures
+      const measurePromises = measures.map(measure => {
+        let title = measure;
+        let desc = '';
+        if (typeof measure === 'string' && measure.includes('||')) {
+          [title, desc] = measure.split('||');
+        }
+        return pool.query('INSERT INTO ballot_measures (ballot_id, measure_text, measure_description) VALUES ($1, $2, $3) RETURNING id, measure_text, measure_description', [ballotId, title, desc]);
+      });
+      await Promise.all(measurePromises);
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update ballot' });
+  }
 });
 router.delete('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => {
   // Admin: delete ballot

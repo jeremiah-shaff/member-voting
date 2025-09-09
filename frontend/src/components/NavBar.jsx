@@ -7,9 +7,8 @@ export default function NavBar() {
 
   return (
     <nav style={{marginBottom: '20px'}}>
-      <Link to="/">Login</Link> |{' '}
-      <Link to="/register">Register</Link> |{' '}
-      {token && <Link to="/ballots">Ballots</Link>}
+  {!token && <><Link to="/">Login</Link> |{' '}<Link to="/register">Register</Link> |{' '}</>}
+  {token && <Link to="/ballots">Ballots</Link>}
       {isAdmin && (
         <>
           {' '}| <Link to="/admin">Admin Dashboard</Link>

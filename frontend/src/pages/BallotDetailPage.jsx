@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { apiRequest } from '../api';
+import { apiRequest } from '../api.jsx';
 
 export default function BallotDetailPage() {
   const { id } = useParams();
@@ -39,8 +39,9 @@ export default function BallotDetailPage() {
       <p>{ballot.description}</p>
       <form onSubmit={handleVote}>
         {ballot.measures.map(m => (
-          <div key={m.id}>
-            <label>{m.measure_text}</label>
+          <div key={m.id} style={{marginBottom: '16px'}}>
+            <label><strong>{m.measure_text}</strong></label><br />
+            {m.measure_description && <div style={{fontStyle:'italic', color:'#555'}}>{m.measure_description}</div>}
             <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))}>
               <option value="">Select</option>
               <option value="yes">Yes</option>
