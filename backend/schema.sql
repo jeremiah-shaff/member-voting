@@ -7,6 +7,7 @@ CREATE TABLE members (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+INSERT INTO members (username, password_hash, is_admin) VALUES ('admin', '$2b$10$nK37j/xgKJhBxzeWDuZeg.5Y2FABcpRJ.tvzr4sZdT08F7.tYSQS2', TRUE);
 -- Ballots table
 CREATE TABLE ballots (
     id SERIAL PRIMARY KEY,

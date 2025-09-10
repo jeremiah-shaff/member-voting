@@ -37,12 +37,15 @@ export default function BallotDetailPage() {
     <div>
       <h2>{ballot.title}</h2>
       <p>{ballot.description}</p>
+      {ballot.has_voted ? (
+        <div style={{color:'green', fontWeight:'bold', marginBottom:'1em'}}>You have already voted on this ballot.</div>
+      ) : null}
       <form onSubmit={handleVote}>
         {ballot.measures.map(m => (
           <div key={m.id} style={{marginBottom: '16px'}}>
             <label><strong>{m.measure_text}</strong></label><br />
             {m.measure_description && <div style={{fontStyle:'italic', color:'#555'}}>{m.measure_description}</div>}
-            <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))}>
+            <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))} disabled={ballot.has_voted}>
               <option value="">Select</option>
               <option value="yes">Yes</option>
               <option value="no">No</option>
@@ -50,7 +53,7 @@ export default function BallotDetailPage() {
             </select>
           </div>
         ))}
-        <button type="submit">Submit Vote</button>
+        <button type="submit" disabled={ballot.has_voted}>Submit Vote</button>
       </form>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}

@@ -18,6 +18,10 @@ app.use((req, res, next) => {
   next();
 });
 
+
+// Serve uploads directory for branding images
+app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
+
 // API routes
 const routes = require('./routes');
 app.use('/api', routes);

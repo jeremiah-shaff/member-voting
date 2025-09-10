@@ -5,6 +5,91 @@ const router = express.Router();
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const upload = multer({ dest: path.join(__dirname, 'uploads/') });
+
+const { authenticateToken, requireAdmin } = require('./middleware');
+
+// Branding table setup (run manually in schema.sql):
+// CREATE TABLE branding (
+//   id SERIAL PRIMARY KEY,
+//   bg_color VARCHAR(32),
+//   nav_color VARCHAR(32),
+//   fqdn VARCHAR(255),
+//   logo_path VARCHAR(255),
+//   icon_path VARCHAR(255)
+// );
+
+// Get branding settings
+router.get('/branding', async (req, res) => {
+  try {
+    const pool = req.pool;
+    const result = await pool.query('SELECT * FROM branding ORDER BY id DESC LIMIT 1');
+    res.json(result.rows[0] || {});
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get branding' });
+  }
+});
+
+// Admin: update branding settings (colors, fqdn)
+router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
+  const { bg_color, nav_color, text_color, fqdn } = req.body;
+  try {
+    const pool = req.pool;
+    // Upsert branding row
+    const brand_id = (await pool.query('SELECT id FROM branding')).rows[0].id;
+    const result = await pool.query(
+      'UPDATE branding SET bg_color = $1, nav_color = $2, text_color = $3, fqdn = $4 WHERE id = $5 RETURNING *',
+      [bg_color || '', nav_color || '', text_color || '', fqdn || '', brand_id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update branding' });
+  }
+});
+
+// Admin: upload logo
+
+router.post('/branding/logo', authenticateToken, requireAdmin, upload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const pool = req.pool;
+    // Get extension from originalname
+    const ext = path.extname(req.file.originalname);
+    const newFilename = req.file.filename + ext;
+    const oldPath = req.file.path;
+    const newPath = path.join(path.dirname(oldPath), newFilename);
+    fs.renameSync(oldPath, newPath);
+    const logoPath = '/uploads/' + newFilename;
+    await pool.query('UPDATE branding SET logo_path = $1', [logoPath]);
+    res.json({ logo_path: logoPath });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload logo' });
+  }
+});
+
+// Admin: upload icon
+
+router.post('/branding/icon', authenticateToken, requireAdmin, upload.single('icon'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const pool = req.pool;
+    // Get extension from originalname
+    const ext = path.extname(req.file.originalname);
+    const newFilename = req.file.filename + ext;
+    const oldPath = req.file.path;
+    const newPath = path.join(path.dirname(oldPath), newFilename);
+    fs.renameSync(oldPath, newPath);
+    const iconPath = '/uploads/' + newFilename;
+    await pool.query('UPDATE branding SET icon_path = $1', [iconPath]);
+    res.json({ icon_path: iconPath });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload icon' });
+  }
+});
+
 
 // Register member or admin
 router.post('/auth/register', async (req, res) => {
@@ -46,8 +131,6 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-
-const { authenticateToken, requireAdmin } = require('./middleware');
 
 // Ballot routes
 
@@ -115,6 +198,12 @@ router.get('/ballots/:id', authenticateToken, async (req, res) => {
     );
     const ballot = ballotResult.rows[0];
     ballot.measures = measuresResult.rows;
+    // Check if current user has voted on any measure in this ballot
+    const voteCheck = await pool.query(
+      'SELECT COUNT(*) FROM votes WHERE ballot_id = $1 AND member_id = $2',
+      [ballotId, req.user.id]
+    );
+    ballot.has_voted = Number(voteCheck.rows[0].count) > 0;
     res.json(ballot);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get ballot details' });
@@ -225,6 +314,77 @@ router.get('/ballots/:id/results', authenticateToken, async (req, res) => {
     res.json({ ballot_id: ballotId, results });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get ballot results' });
+  }
+});
+
+// Admin: list all members
+router.get('/members', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const result = await pool.query('SELECT id, username, is_admin, created_at FROM members ORDER BY id');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list members' });
+  }
+});
+
+// Admin: add member
+router.post('/members', authenticateToken, requireAdmin, async (req, res) => {
+  const { username, password, is_admin } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  try {
+    const pool = req.pool;
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO members (username, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING id, username, is_admin',
+      [username, hash, is_admin || false]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      res.status(409).json({ error: 'Username already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to add member' });
+    }
+  }
+});
+
+// Admin: edit member (username, password, admin status)
+router.put('/members/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const memberId = req.params.id;
+  const { username, password, is_admin } = req.body;
+  try {
+    const pool = req.pool;
+    let query = 'UPDATE members SET ';
+    let params = [];
+    let updates = [];
+    if (username) { updates.push('username = $' + (params.length+1)); params.push(username); }
+    if (typeof is_admin === 'boolean') { updates.push('is_admin = $' + (params.length+1)); params.push(is_admin); }
+    if (password) {
+      const hash = await bcrypt.hash(password, 10);
+      updates.push('password_hash = $' + (params.length+1)); params.push(hash);
+    }
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    query += updates.join(', ') + ' WHERE id = $' + (params.length+1) + ' RETURNING id, username, is_admin';
+    params.push(memberId);
+    const result = await pool.query(query, params);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update member' });
+  }
+});
+
+// Admin: delete member
+router.delete('/members/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const memberId = req.params.id;
+  try {
+    const pool = req.pool;
+    const result = await pool.query('DELETE FROM members WHERE id = $1 RETURNING id', [memberId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete member' });
   }
 });
 
