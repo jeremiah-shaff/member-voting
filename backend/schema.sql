@@ -46,6 +46,3 @@ CREATE TABLE ballot_reports (
     report_data JSONB,
     generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO member_voting_user;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO member_voting_user;
