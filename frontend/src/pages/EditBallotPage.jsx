@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api.jsx';
 
-export default function EditBallotPage() {
+export default function EditBallotPage({ branding }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [ballot, setBallot] = useState(null);
@@ -95,12 +95,12 @@ export default function EditBallotPage() {
             <label>Measure Description<br />
               <textarea value={m.description} onChange={e => handleMeasureChange(idx, { ...m, description: e.target.value })} placeholder={`Describe measure ${idx+1}`} />
             </label><br />
-            <button type="button" onClick={() => removeMeasure(idx)} disabled={measures.length === 1}>Remove</button>
+            <button type="button" onClick={() => removeMeasure(idx)} disabled={measures.length === 1} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Remove</button>
           </div>
         ))}
-        <button type="button" onClick={addMeasure}>Add Measure</button>
+  <button type="button" onClick={addMeasure} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add Measure</button>
         <br />
-        <button type="submit">Update Ballot</button>
+  <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Update Ballot</button>
       </form>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}

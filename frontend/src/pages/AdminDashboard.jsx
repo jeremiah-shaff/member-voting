@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../api.jsx';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ branding }) {
+  const handleDeleteBallot = async (id) => {
+    if (!window.confirm('Delete this ballot and all related measures and votes?')) return;
+    const token = localStorage.getItem('token');
+    const res = await apiRequest(`/ballots/${id}`, 'DELETE', null, token);
+    if (res.success) {
+      setBallots(ballots => ballots.filter(b => b.id !== id));
+      setError('');
+      if (selectedBallot === id) setReport(null);
+    } else {
+      setError(res.error || 'Delete failed');
+    }
+  };
   const [ballots, setBallots] = useState([]);
   const [error, setError] = useState('');
   const [report, setReport] = useState(null);
@@ -29,8 +41,10 @@ export default function AdminDashboard() {
       <ul>
         {ballots.map(b => (
           <li key={b.id}>
-            {b.title} <button onClick={() => fetchReport(b.id)}>View Report</button>
-            {' '}<a href={`/admin/edit-ballot/${b.id}`}><button>Edit</button></a>
+            {b.title}
+            <button onClick={() => fetchReport(b.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}} >View Report</button>
+            <a href={`/admin/edit-ballot/${b.id}`}><button style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Edit</button></a>
+            <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
           </li>
         ))}
       </ul>

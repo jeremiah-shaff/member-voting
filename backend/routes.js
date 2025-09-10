@@ -12,16 +12,6 @@ const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
 const { authenticateToken, requireAdmin } = require('./middleware');
 
-// Branding table setup (run manually in schema.sql):
-// CREATE TABLE branding (
-//   id SERIAL PRIMARY KEY,
-//   bg_color VARCHAR(32),
-//   nav_color VARCHAR(32),
-//   fqdn VARCHAR(255),
-//   logo_path VARCHAR(255),
-//   icon_path VARCHAR(255)
-// );
-
 // Get branding settings
 router.get('/branding', async (req, res) => {
   try {
@@ -35,14 +25,14 @@ router.get('/branding', async (req, res) => {
 
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
-  const { bg_color, nav_color, text_color, fqdn } = req.body;
+  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn } = req.body;
   try {
     const pool = req.pool;
     // Upsert branding row
     const brand_id = (await pool.query('SELECT id FROM branding')).rows[0].id;
     const result = await pool.query(
-      'UPDATE branding SET bg_color = $1, nav_color = $2, text_color = $3, fqdn = $4 WHERE id = $5 RETURNING *',
-      [bg_color || '', nav_color || '', text_color || '', fqdn || '', brand_id]
+      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6 WHERE id = $7 RETURNING *',
+      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', brand_id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -242,7 +232,21 @@ router.put('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => 
   }
 });
 router.delete('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => {
-  // Admin: delete ballot
+  // Admin: delete ballot and all related measures and votes
+  const ballotId = req.params.id;
+  try {
+    const pool = req.pool;
+    // Delete votes for this ballot
+    await pool.query('DELETE FROM votes WHERE ballot_id = $1', [ballotId]);
+    // Delete measures for this ballot
+    await pool.query('DELETE FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
+    // Delete the ballot itself
+    const result = await pool.query('DELETE FROM ballots WHERE id = $1 RETURNING id', [ballotId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
+    res.json({ success: true, deleted_ballot_id: ballotId });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete ballot' });
+  }
 });
 
 // Ballot measure routes

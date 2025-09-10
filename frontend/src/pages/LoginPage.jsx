@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { apiRequest } from '../api.jsx';
 
-export default function LoginPage() {
+export default function LoginPage({ branding }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +24,7 @@ export default function LoginPage() {
       <form onSubmit={handleLogin}>
         <input placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
         <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-        <button type="submit">Login</button>
+        <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Login</button>
       </form>
       {error && <div style={{color:'red'}}>{error}</div>}
     </div>

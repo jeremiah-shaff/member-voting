@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { apiRequest } from '../api.jsx';
 
-export default function BallotDetailPage() {
+export default function BallotDetailPage({ branding }) {
   const { id } = useParams();
   const [ballot, setBallot] = useState(null);
   const [votes, setVotes] = useState({});
@@ -53,7 +53,7 @@ export default function BallotDetailPage() {
             </select>
           </div>
         ))}
-        <button type="submit" disabled={ballot.has_voted}>Submit Vote</button>
+  <button type="submit" disabled={ballot.has_voted} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Submit Vote</button>
       </form>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}

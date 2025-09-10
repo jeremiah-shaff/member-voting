@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../api.jsx';
 
-export default function MemberManagementPage() {
+export default function MemberManagementPage({ branding }) {
   const [members, setMembers] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -78,7 +78,7 @@ export default function MemberManagementPage() {
         <label style={{marginLeft:'1em'}}>
           <input type="checkbox" checked={form.is_admin} onChange={e => setForm(f => ({ ...f, is_admin: e.target.checked }))} /> Admin
         </label>
-        <button type="submit">Add</button>
+  <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add</button>
       </form>
       <h4>Members</h4>
       <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
@@ -106,13 +106,13 @@ export default function MemberManagementPage() {
                 {editId === m.id ? (
                   <>
                     <input type="password" placeholder="New password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
-                    <button onClick={handleUpdate}>Save</button>
-                    <button onClick={() => setEditId(null)}>Cancel</button>
+                    <button onClick={handleUpdate} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Save</button>
+                    <button onClick={() => setEditId(null)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Cancel</button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => handleEdit(m)}>Edit</button>
-                    <button onClick={() => handleDelete(m.id)}>Delete</button>
+                    <button onClick={() => handleEdit(m)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Edit</button>
+                    <button onClick={() => handleDelete(m.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Delete</button>
                   </>
                 )}
               </td>

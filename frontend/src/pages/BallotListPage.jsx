@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../api.jsx';
 
-export default function BallotListPage() {
+export default function BallotListPage({ branding }) {
   const [ballots, setBallots] = useState([]);
   const [error, setError] = useState('');
 

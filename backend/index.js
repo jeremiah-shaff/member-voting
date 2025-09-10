@@ -1,8 +1,12 @@
 require('dotenv').config();
+
+const fs = require('fs');
+const https = require('https');
+const { getCertificate, CERT_DIR } = require('./acme');
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-
 
 const app = express();
 app.use(cors());
@@ -18,7 +22,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // Serve uploads directory for branding images
 app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
 
@@ -30,7 +33,32 @@ app.get('/', (req, res) => {
   res.send('Member Voting API is running');
 });
 
+// Endpoint to request/renew ACME certificate
+app.post('/api/request-certificate', async (req, res) => {
+  const fqdn = req.body.fqdn || process.env.FQDN;
+  if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
+  try {
+    const { key, cert } = await getCertificate(fqdn);
+    res.json({ success: true });
+    process.exit(0); // Restart to reload cert
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
+const FQDN = process.env.FQDN;
+const keyPath = CERT_DIR + '/privkey.pem';
+const certPath = CERT_DIR + '/cert.pem';
+if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+  const key = fs.readFileSync(keyPath);
+  const cert = fs.readFileSync(certPath);
+  https.createServer({ key, cert }, app).listen(443, () => {
+    console.log('HTTPS server running on port 443');
+  });
+}
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`HTTP server running on port ${PORT}`);
+  // Start auto-renewal scheduler
+  require('./renewal');
 });
