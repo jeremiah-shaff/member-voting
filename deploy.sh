@@ -104,13 +104,30 @@ sudo systemctl start member-voting-frontend
 sudo tee /etc/nginx/sites-available/member-voting > /dev/null <<NGINX
 server {
     listen 80;
+    listen 443 ssl;
     server_name $FQDN;
 
-    location / {
-        root $APP_DIR/frontend/dist;
-        try_files \$uri \$uri/ /index.html;
+    # SSL config (Certbot will update these paths)
+    ssl_certificate /etc/letsencrypt/live/$FQDN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$FQDN/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Redirect HTTP to HTTPS
+    if (\$scheme = http) {
+        return 301 https://\$host\$request_uri;
     }
 
+    # Proxy frontend (Vite dev server)
+    location / {
+        proxy_pass http://localhost:5173/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Proxy API
     location /api/ {
         proxy_pass http://localhost:4000/api/;
         proxy_set_header Host \$host;
@@ -119,6 +136,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    # Proxy uploads
     location /uploads/ {
         proxy_pass http://localhost:4000/uploads/;
     }
