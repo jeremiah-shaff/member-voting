@@ -31,7 +31,12 @@ npm install
 # Install frontend dependencies
 cd ../frontend
 npm install
-npm run build
+sudo npm install -g vite
+
+# Create .env for frontend if needed
+cat <<ENV | sudo tee "$APP_DIR/frontend/.env"
+VITE_API_URL=http://localhost:4000/api
+ENV
 
 # Setup PostgreSQL
 sudo -u postgres psql <<EOF
@@ -72,6 +77,28 @@ SERVICE
 sudo systemctl daemon-reload
 sudo systemctl enable member-voting-backend
 sudo systemctl start member-voting-backend
+
+# Setup systemd service for frontend (Vite dev server)
+sudo tee /etc/systemd/system/member-voting-frontend.service > /dev/null <<SERVICE
+[Unit]
+Description=Member Voting Frontend (Vite)
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$APP_DIR/frontend
+ExecStart=/usr/bin/vite --port 5173
+Restart=always
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+sudo systemctl daemon-reload
+sudo systemctl enable member-voting-frontend
+sudo systemctl start member-voting-frontend
 
 # Configure Nginx
 sudo tee /etc/nginx/sites-available/member-voting > /dev/null <<NGINX
