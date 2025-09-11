@@ -16,7 +16,8 @@ const { getCertificate } = require('./acme');
 // ACME HTTP-01 challenge route
 router.get('/.well-known/acme-challenge/:token', (req, res) => {
   const token = req.params.token;
-  const challengeValue = global.__acmeChallengeValue;
+  const challengeMap = global.__acmeChallengeMap || {};
+  const challengeValue = challengeMap[token];
   console.log(`[ACME Challenge] Received request for token: ${token}`);
   if (token && challengeValue) {
     console.log(`[ACME Challenge] Responding with challenge value: ${challengeValue}`);
