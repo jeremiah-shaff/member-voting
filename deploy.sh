@@ -31,11 +31,12 @@ npm install
 # Install frontend dependencies
 cd ../frontend
 npm install
-sudo npm install -g vite
+npm run build
+
 
 # Create .env for frontend if needed
 cat <<ENV | sudo tee "$APP_DIR/frontend/.env"
-VITE_API_URL=http://localhost:4000/api
+VITE_API_URL=/api
 ENV
 
 # Setup PostgreSQL
@@ -78,53 +79,16 @@ sudo systemctl daemon-reload
 sudo systemctl enable member-voting-backend
 sudo systemctl start member-voting-backend
 
-# Setup systemd service for frontend (Vite dev server)
-sudo tee /etc/systemd/system/member-voting-frontend.service > /dev/null <<SERVICE
-[Unit]
-Description=Member Voting Frontend (Vite)
-After=network.target
-
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$APP_DIR/frontend
-ExecStart=/usr/bin/vite --port 5173
-Restart=always
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-sudo systemctl daemon-reload
-sudo systemctl enable member-voting-frontend
-sudo systemctl start member-voting-frontend
-
 # Configure Nginx
 sudo tee /etc/nginx/sites-available/member-voting > /dev/null <<NGINX
 server {
     listen 80;
-    listen 443 ssl;
     server_name $FQDN;
 
-    # SSL config (Certbot will update these paths)
-    ssl_certificate /etc/letsencrypt/live/$FQDN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$FQDN/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
-    # Redirect HTTP to HTTPS
-    if (\$scheme = http) {
-        return 301 https://\$host\$request_uri;
-    }
-
-    # Proxy frontend (Vite dev server)
+    # Serve static frontend build
     location / {
-        proxy_pass http://localhost:5173/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        root $APP_DIR/frontend/dist;
+        try_files \$uri \$uri/ /index.html;
     }
 
     # Proxy API

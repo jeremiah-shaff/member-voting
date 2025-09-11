@@ -15,7 +15,7 @@ function App() {
   const [branding, setBranding] = useState({ bg_color: '', nav_color: '', text_color: '', fqdn: '', logo_path: '', icon_path: '' });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/branding').then(res => res.json()).then(data => {
+    fetch('/api/branding').then(res => res.json()).then(data => {
       if (data) setBranding(data);
     });
   }, []);
@@ -32,7 +32,7 @@ function App() {
         favicon.rel = 'icon';
         document.head.appendChild(favicon);
       }
-      favicon.href = `http://localhost:4000${branding.icon_path}`;
+      favicon.href = `${branding.icon_path}`;
     }
   }, [branding.bg_color, branding.text_color, branding.icon_path]);
 
@@ -65,7 +65,7 @@ function App() {
           <div style={{width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start'}}>
             {branding.logo_path && (
               <div style={{textAlign:'center', marginTop:'8px', marginBottom:'0'}}>
-                <img src={`http://localhost:4000${branding.logo_path}`} alt="Logo" style={{maxHeight:'80px', marginBottom:'0'}} />
+                <img src={`${branding.logo_path}`} alt="Logo" style={{maxHeight:'80px', marginBottom:'0'}} />
               </div>
             )}
             <div style={{width:'100%', marginTop:'0'}}>
