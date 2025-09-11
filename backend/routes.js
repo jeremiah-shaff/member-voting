@@ -263,7 +263,7 @@ router.get('/ballots/:id/measures', authenticateToken, async (req, res) => {
 // Member: submit anonymous vote
 router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
   const ballotId = req.params.id;
-  const { votes } = req.body; // votes: [{ measure_id, value }]
+  const { votes } = req.body; // votes: [{ measure_id, vote_value }]
   if (!Array.isArray(votes) || votes.length === 0) {
     return res.status(400).json({ error: 'No votes submitted' });
   }
@@ -283,7 +283,7 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
     }
     // Insert votes (electronic)
     const votePromises = votes.map(v =>
-      pool.query("INSERT INTO votes (ballot_id, measure_id, member_id, value, count, vote_type) VALUES ($1, $2, $3, $4, 1, $5)", [ballotId, v.measure_id, req.user.id, v.value, 'electronic'])
+      pool.query("INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 1, $5)", [ballotId, v.measure_id, req.user.id, v.value, 'electronic'])
     );
     await Promise.all(votePromises);
     res.status(201).json({ success: true });
@@ -301,10 +301,10 @@ router.get('/ballots/:id/results', authenticateToken, async (req, res) => {
     const measuresResult = await pool.query('SELECT id, measure_text FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
     // Get votes per measure, aggregate both electronic and paper votes
     const votesResult = await pool.query(
-      `SELECT measure_id, value, SUM(count) as count, vote_type
+      `SELECT measure_id, vote_value, SUM(vote_count) as vote_count, vote_type
        FROM votes
        WHERE ballot_id = $1
-       GROUP BY measure_id, value, vote_type`,
+       GROUP BY measure_id, vote_value, vote_type`,
       [ballotId]
     );
     // Aggregate results
@@ -313,13 +313,13 @@ router.get('/ballots/:id/results', authenticateToken, async (req, res) => {
       // Group by value, sum counts across vote_type
       const voteCounts = {};
       for (const v of measureVotes) {
-        if (!voteCounts[v.value]) voteCounts[v.value] = 0;
-        voteCounts[v.value] += Number(v.count);
+        if (!voteCounts[v.vote_value]) voteCounts[v.vote_value] = 0;
+        voteCounts[v.vote_value] += Number(v.vote_count);
       }
       return {
         measure_id: measure.id,
         measure_text: measure.measure_text,
-        votes: Object.entries(voteCounts).map(([value, count]) => ({ value, count }))
+        votes: Object.entries(voteCounts).map(([vote_value, vote_count]) => ({ vote_value, vote_count }))
       };
     });
     res.json({ ballot_id: ballotId, results });
