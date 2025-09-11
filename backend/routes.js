@@ -13,6 +13,14 @@ const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
 const { authenticateToken, requireAdmin } = require('./middleware');
 const { getCertificate } = require('./acme');
+// ACME HTTP-01 challenge route
+router.get('/.well-known/acme-challenge/:token', (req, res) => {
+  if (req.params.token && global.__acmeChallengeValue) {
+    res.send(global.__acmeChallengeValue);
+  } else {
+    res.status(404).end();
+  }
+});
 
 // Request logging middleware
 router.use((req, res, next) => {
