@@ -95,6 +95,33 @@ export default function AdminDashboard({ branding }) {
                   })}
                 </div>
                 <div style={{fontSize:'0.9em', color:'#555'}}>Total votes: {totalVotes}</div>
+                <div style={{marginTop:'1em'}}>
+                  <form onSubmit={async e => {
+                    e.preventDefault();
+                    const token = localStorage.getItem('token');
+                    const yes = Number(e.target[`yes_${m.measure_id}`].value);
+                    const no = Number(e.target[`no_${m.measure_id}`].value);
+                    const abstain = Number(e.target[`abstain_${m.measure_id}`].value);
+                    const res = await apiRequest(`/ballots/${selectedBallot}/paper-votes`, 'POST', {
+                      measure_id: m.measure_id,
+                      yes,
+                      no,
+                      abstain
+                    }, token);
+                    if (res.success) {
+                      setError('');
+                      fetchReport(selectedBallot); // refresh report
+                    } else {
+                      setError(res.error || 'Failed to record paper votes');
+                    }
+                  }} style={{display:'flex', gap:'1em', alignItems:'center'}}>
+                    <span style={{fontWeight:'bold'}}>Record Paper Ballots:</span>
+                    <label>Yes <input type="number" min="0" name={`yes_${m.measure_id}`} defaultValue={0} style={{width:'60px'}} /></label>
+                    <label>No <input type="number" min="0" name={`no_${m.measure_id}`} defaultValue={0} style={{width:'60px'}} /></label>
+                    <label>Abstain <input type="number" min="0" name={`abstain_${m.measure_id}`} defaultValue={0} style={{width:'60px'}} /></label>
+                    <button type="submit" style={{background:'#1e4166', color:'#fff', border:'none', borderRadius:'4px', padding:'4px 12px'}}>Save</button>
+                  </form>
+                </div>
               </div>
             );
           })}

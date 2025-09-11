@@ -35,8 +35,11 @@ CREATE TABLE votes (
     ballot_id INTEGER REFERENCES ballots(id) ON DELETE CASCADE,
     measure_id INTEGER REFERENCES ballot_measures(id) ON DELETE CASCADE,
     member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
-    vote_value VARCHAR(50) NOT NULL,
-    voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    value VARCHAR(50) NOT NULL,
+    count INTEGER DEFAULT 1,
+    vote_type VARCHAR(16) DEFAULT 'electronic',
+    voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_vote UNIQUE (ballot_id, measure_id, value, vote_type, member_id)
 );
 
 -- Ballot Reports table
