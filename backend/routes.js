@@ -16,15 +16,11 @@ const { getCertificate } = require('./acme');
 // ACME HTTP-01 challenge route
 router.get('/.well-known/acme-challenge/:token', (req, res) => {
   const token = req.params.token;
-  const challengeMap = global.__acmeChallengeMap || {};
-  const challengeValue = challengeMap[token];
-  console.log(`[ACME Challenge] Received request for token: ${token}`);
-  if (token && challengeValue) {
-    console.log(`[ACME Challenge] Responding with challenge value: ${challengeValue}`);
-    res.send(challengeValue);
+  const challengeValue = global.__acmeChallengeMap[token];
+  if (challengeValue) {
+    res.status(200).send(challengeValue);
   } else {
-    console.warn(`[ACME Challenge] Challenge not found for token: ${token}`);
-    res.status(404).end();
+    res.status(404).send('Challenge token not found');
   }
 });
 
@@ -516,16 +512,11 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
   const fqdn = req.body.fqdn;
   if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
   try {
-  console.log(`[Request Certificate] Starting certificate request for FQDN: ${fqdn}`);
-  await getCertificate(fqdn);
-  console.log(`[Request Certificate] Certificate successfully obtained for FQDN: ${fqdn}`);
-  res.json({ success: true, message: `Certificate successfully obtained for ${fqdn}` });
-  console.log('[Request Certificate] Restarting process to reload certificate...');
-  process.exit(0); // Restart to reload cert
+    await getCertificate(fqdn);
+    res.json({ success: true, message: `Certificate successfully obtained for ${fqdn}` });
+    setTimeout(() => process.exit(0), 1000); // Give response time to flush
   } catch (err) {
-  console.error(`[Request Certificate] Error requesting certificate for FQDN: ${fqdn}`);
-  console.error(err);
-  res.status(500).json({ error: err.message || 'Certificate request failed', details: err.toString() });
+    res.status(500).json({ error: err.message || 'Certificate request failed' });
   }
 });
 
