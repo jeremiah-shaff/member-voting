@@ -11,6 +11,7 @@ const multer = require('multer');
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
 const { authenticateToken, requireAdmin } = require('./middleware');
+const { getCertificate } = require('./acme');
 
 // Get branding settings
 router.get('/branding', async (req, res) => {
@@ -393,6 +394,38 @@ router.delete('/members/:id', authenticateToken, requireAdmin, async (req, res) 
 });
 
 // Reporting routes
+// Admin: record paper ballot lump sum for a measure
+router.post('/ballots/:id/paper-votes', authenticateToken, requireAdmin, async (req, res) => {
+  const ballotId = req.params.id;
+  const { measure_id, yes, no, abstain } = req.body;
+  if (!measure_id || (yes == null && no == null && abstain == null)) {
+    return res.status(400).json({ error: 'Missing measure_id or vote counts' });
+  }
+  try {
+    const pool = req.pool;
+    // Insert or update paper votes for this measure
+    // We'll use a new vote_type 'paper' in the votes table
+    const types = [
+      { value: 'yes', count: yes },
+      { value: 'no', count: no },
+      { value: 'abstain', count: abstain }
+    ];
+    for (const t of types) {
+      if (t.count != null) {
+        // Upsert: if a paper vote for this measure/value exists, update, else insert
+        await pool.query(
+          `INSERT INTO votes (ballot_id, measure_id, value, count, vote_type) VALUES ($1, $2, $3, $4, 'paper')
+           ON CONFLICT (ballot_id, measure_id, value, vote_type)
+           DO UPDATE SET count = EXCLUDED.count`,
+          [ballotId, measure_id, t.value, t.count]
+        );
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to record paper votes' });
+  }
+});
 
 // Admin: get ballot report
 router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, res) => {
@@ -447,6 +480,19 @@ router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, r
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: 'Failed to generate report' });
+  }
+});
+
+// Admin: request ACME certificate for FQDN
+router.post('/request-certificate', authenticateToken, requireAdmin, async (req, res) => {
+  const fqdn = req.body.fqdn;
+  if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
+  try {
+    await getCertificate(fqdn);
+    res.json({ success: true });
+    process.exit(0); // Restart to reload cert
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Certificate request failed' });
   }
 });
 
