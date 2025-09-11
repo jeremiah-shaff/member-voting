@@ -21,17 +21,25 @@ async function getCertificate(fqdn) {
   });
 
   // HTTP-01 challenge
-  global.__acmeChallengeValue = null;
+  if (!global.__acmeChallengeMap) global.__acmeChallengeMap = {};
 
   const cert = await client.auto({
     csr,
     email: process.env.ACME_EMAIL,
     termsOfServiceAgreed: true,
     challengeCreateFn: async (authz, challenge, keyAuthorization) => {
-      global.__acmeChallengeValue = keyAuthorization;
+      // Store challenge value per token
+      if (challenge && challenge.token) {
+        global.__acmeChallengeMap[challenge.token] = keyAuthorization;
+        console.log(`[ACME] Challenge created for token: ${challenge.token}`);
+      }
     },
-    challengeRemoveFn: async () => {
-      global.__acmeChallengeValue = null;
+    challengeRemoveFn: async (authz, challenge) => {
+      // Remove challenge value for token
+      if (challenge && challenge.token) {
+        delete global.__acmeChallengeMap[challenge.token];
+        console.log(`[ACME] Challenge removed for token: ${challenge.token}`);
+      }
     }
   });
   fs.writeFileSync(path.join(CERT_DIR, 'privkey.pem'), key);
