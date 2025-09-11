@@ -68,6 +68,10 @@ export default function AdminDashboard({ branding }) {
           {report.results.map((m, idx) => {
             const acceptance = report.acceptance.find(a => a.measure_id === m.measure_id)?.accepted;
             const totalVotes = m.votes.reduce((sum, v) => sum + v.count, 0);
+            // Find current paper ballot counts for this measure
+            const paperYes = m.votes.find(v => v.value === 'yes')?.count || 0;
+            const paperNo = m.votes.find(v => v.value === 'no')?.count || 0;
+            const paperAbstain = m.votes.find(v => v.value === 'abstain')?.count || 0;
             return (
               <div key={m.measure_id} style={{marginBottom: '2em', border: '1px solid #ccc', borderRadius: '8px', padding: '1em'}}>
                 <div style={{fontWeight:'bold'}}>{m.measure_text}</div>
@@ -117,8 +121,9 @@ export default function AdminDashboard({ branding }) {
                   }} style={{display:'flex', gap:'1em', alignItems:'center'}}>
                     <span style={{fontWeight:'bold'}}>Record Paper Ballots:</span>
                     <label>Yes <input type="number" min="0" name={`yes_${m.measure_id}`} defaultValue={0} style={{width:'60px'}} /></label>
-                    <label>No <input type="number" min="0" name={`no_${m.measure_id}`} defaultValue={0} style={{width:'60px'}} /></label>
-                    <label>Abstain <input type="number" min="0" name={`abstain_${m.measure_id}`} defaultValue={0} style={{width:'60px'}} /></label>
+                    <label>Yes <input type="number" min="0" name={`yes_${m.measure_id}`} defaultValue={paperYes} style={{width:'60px'}} /></label>
+                    <label>No <input type="number" min="0" name={`no_${m.measure_id}`} defaultValue={paperNo} style={{width:'60px'}} /></label>
+                    <label>Abstain <input type="number" min="0" name={`abstain_${m.measure_id}`} defaultValue={paperAbstain} style={{width:'60px'}} /></label>
                     <button type="submit" style={{background:'#1e4166', color:'#fff', border:'none', borderRadius:'4px', padding:'4px 12px'}}>Save</button>
                   </form>
                 </div>
