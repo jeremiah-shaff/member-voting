@@ -1,5 +1,15 @@
 const express = require('express');
+const fs = require('fs');
+const LOG_PATH = process.env.REQUEST_LOG_PATH || './request.log';
 const router = express.Router();
+// Request logging middleware
+router.use((req, res, next) => {
+  const logEntry = `${new Date().toISOString()} ${req.method} ${req.originalUrl} IP:${req.ip}\n`;
+  fs.appendFile(LOG_PATH, logEntry, err => {
+    if (err) console.error('Request log error:', err);
+  });
+  next();
+});
 
 // Auth routes
 
@@ -411,23 +421,19 @@ router.post('/ballots/:id/paper-votes', authenticateToken, requireAdmin, async (
     const pool = req.pool;
     // Insert or update paper votes for this measure
     // We'll use a new vote_type 'paper' in the votes table
-    const types = [
-      { value: 'yes', count: yes },
-      { value: 'no', count: no },
-      { value: 'abstain', count: abstain }
-    ];
-    for (const t of types) {
-      if (t.count != null) {
-        // Upsert: if a paper vote for this measure/value exists, update, else insert
-        await pool.query(
-          `INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type)
-           VALUES ($1, $2, NULL, $3, $4, 'paper')
-           ON CONFLICT (ballot_id, measure_id, vote_value, vote_type, member_id)
-           DO UPDATE SET vote_count = EXCLUDED.vote_count`,
-          [ballotId, measure_id, t.value, t.count]
-        );
-      }
-    }
+    // Remove any existing paper votes for this measure
+    await pool.query(
+      `DELETE FROM votes WHERE ballot_id = $1 AND measure_id = $2 AND vote_type = 'paper'`,
+      [ballotId, measure_id]
+    );
+    // Insert a single paper vote record for this measure for each value
+    await pool.query(
+      `INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type)
+       VALUES ($1, $2, NULL, 'yes', $3, 'paper'),
+              ($1, $2, NULL, 'no', $4, 'paper'),
+              ($1, $2, NULL, 'abstain', $5, 'paper')`,
+      [ballotId, measure_id, yes || 0, no || 0, abstain || 0]
+    );
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to record paper votes' });
@@ -445,17 +451,18 @@ router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, r
     const ballot = ballotResult.rows[0];
     // Get measures
     const measuresResult = await pool.query('SELECT id, measure_text FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
-    // Get votes per measure
+    // Get votes per measure (sum vote_count for each value)
     const votesResult = await pool.query(
-      `SELECT measure_id, vote_value, COUNT(*) as count
+      `SELECT measure_id, vote_value, SUM(vote_count) as count
        FROM votes
        WHERE ballot_id = $1
        GROUP BY measure_id, vote_value`,
       [ballotId]
     );
-    // Get total votes
-    const totalVotesResult = await pool.query('SELECT COUNT(DISTINCT member_id) as total_voters FROM votes WHERE ballot_id = $1', [ballotId]);
-    const totalVoters = totalVotesResult.rows[0].total_voters;
+    // Get total voters: sum electronic votes and add paper votes
+    const electronicVotersResult = await pool.query('SELECT COUNT(DISTINCT member_id) as total_voters FROM votes WHERE ballot_id = $1 AND vote_type = $2', [ballotId, 'electronic']);
+    const paperVotesResult = await pool.query('SELECT SUM(vote_count) as paper_total FROM votes WHERE ballot_id = $1 AND vote_type = $2', [ballotId, 'paper']);
+    const totalVoters = Number(electronicVotersResult.rows[0].total_voters || 0) + Number(paperVotesResult.rows[0].paper_total || 0);
     // Quorum and acceptance
     const quorumMet = totalVoters >= ballot.quorum;
     // Aggregate results
