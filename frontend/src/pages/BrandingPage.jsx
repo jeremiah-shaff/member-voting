@@ -97,13 +97,13 @@ export default function BrandingPage() {
       </form>
       <div style={{marginBottom:'2em'}}>
         <h4>Logo</h4>
-  {branding.logo_path && <img src={`http://localhost:4000${branding.logo_path}`} alt="Logo" style={{maxHeight:'80px', marginBottom:'8px'}} />}
+  {branding.logo_path && <img src={`${branding.logo_path}`} alt="Logo" style={{maxHeight:'80px', marginBottom:'8px'}} />}
         <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} />
   <button onClick={() => handleUpload('logo', logoFile)} style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop: '8px'}}>Upload Logo</button>
       </div>
       <div style={{marginBottom:'2em'}}>
         <h4>Site Icon</h4>
-  {branding.icon_path && <img src={`http://localhost:4000${branding.icon_path}`} alt="Icon" style={{maxHeight:'40px', marginBottom:'8px'}} />}
+  {branding.icon_path && <img src={`${branding.icon_path}`} alt="Icon" style={{maxHeight:'40px', marginBottom:'8px'}} />}
         <input type="file" accept="image/*" onChange={e => setIconFile(e.target.files[0])} />
   <button onClick={() => handleUpload('icon', iconFile)} style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop: '8px'}}>Upload Icon</button>
       </div>
