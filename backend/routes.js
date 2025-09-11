@@ -283,7 +283,7 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
     }
     // Insert votes (electronic)
     const votePromises = votes.map(v =>
-      pool.query("INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 1, $5)", [ballotId, v.measure_id, req.user.id, v.value, 'electronic'])
+      pool.query("INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 1, $5)", [ballotId, v.measure_id, req.user.id, v.vote_value, 'electronic'])
     );
     await Promise.all(votePromises);
     res.status(201).json({ success: true });
@@ -420,8 +420,9 @@ router.post('/ballots/:id/paper-votes', authenticateToken, requireAdmin, async (
       if (t.count != null) {
         // Upsert: if a paper vote for this measure/value exists, update, else insert
         await pool.query(
-          `INSERT INTO votes (ballot_id, measure_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 'paper')
-           ON CONFLICT (ballot_id, measure_id, vote_value, vote_type)
+          `INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type)
+           VALUES ($1, $2, NULL, $3, $4, 'paper')
+           ON CONFLICT (ballot_id, measure_id, vote_value, vote_type, member_id)
            DO UPDATE SET vote_count = EXCLUDED.vote_count`,
           [ballotId, measure_id, t.value, t.count]
         );
