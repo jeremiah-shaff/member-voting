@@ -39,7 +39,7 @@ CREATE TABLE votes (
     vote_count INTEGER DEFAULT 1,
     vote_type VARCHAR(16) DEFAULT 'electronic',
     voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_vote UNIQUE (ballot_id, measure_id, value, vote_type, member_id)
+    CONSTRAINT unique_vote UNIQUE (ballot_id, measure_id, vote_value, vote_type, member_id)
 );
 
 -- Ballot Reports table
