@@ -510,11 +510,16 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
   const fqdn = req.body.fqdn;
   if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
   try {
-    await getCertificate(fqdn);
-    res.json({ success: true });
-    process.exit(0); // Restart to reload cert
+  console.log(`[Request Certificate] Starting certificate request for FQDN: ${fqdn}`);
+  await getCertificate(fqdn);
+  console.log(`[Request Certificate] Certificate successfully obtained for FQDN: ${fqdn}`);
+  res.json({ success: true, message: `Certificate successfully obtained for ${fqdn}` });
+  console.log('[Request Certificate] Restarting process to reload certificate...');
+  process.exit(0); // Restart to reload cert
   } catch (err) {
-    res.status(500).json({ error: err.message || 'Certificate request failed' });
+  console.error(`[Request Certificate] Error requesting certificate for FQDN: ${fqdn}`);
+  console.error(err);
+  res.status(500).json({ error: err.message || 'Certificate request failed', details: err.toString() });
   }
 });
 

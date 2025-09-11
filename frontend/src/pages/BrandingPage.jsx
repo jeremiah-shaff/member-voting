@@ -76,20 +76,25 @@ export default function BrandingPage() {
     onClick={async () => {
       setError(''); setSuccess('');
       if (!form.fqdn) { setError('FQDN required'); return; }
+      setSuccess('Requesting certificate...');
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/request-certificate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ fqdn: form.fqdn })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess('Certificate requested! Server will reload with HTTPS.');
-      } else {
-        setError(data.error || 'Certificate request failed');
+      try {
+        const res = await fetch('/api/request-certificate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ fqdn: form.fqdn })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSuccess(data.message || 'Certificate requested! Server will reload with HTTPS.');
+        } else {
+          setError(data.error ? `${data.error}${data.details ? ' - ' + data.details : ''}` : 'Certificate request failed');
+        }
+      } catch (err) {
+        setError('Network error: ' + err.toString());
       }
     }}
   >Request Certificate</button><br />
