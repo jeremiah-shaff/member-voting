@@ -420,9 +420,9 @@ router.post('/ballots/:id/paper-votes', authenticateToken, requireAdmin, async (
       if (t.count != null) {
         // Upsert: if a paper vote for this measure/value exists, update, else insert
         await pool.query(
-          `INSERT INTO votes (ballot_id, measure_id, value, count, vote_type) VALUES ($1, $2, $3, $4, 'paper')
-           ON CONFLICT (ballot_id, measure_id, value, vote_type)
-           DO UPDATE SET count = EXCLUDED.count`,
+          `INSERT INTO votes (ballot_id, measure_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 'paper')
+           ON CONFLICT (ballot_id, measure_id, vote_value, vote_type)
+           DO UPDATE SET vote_count = EXCLUDED.vote_count`,
           [ballotId, measure_id, t.value, t.count]
         );
       }
