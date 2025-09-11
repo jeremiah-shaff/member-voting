@@ -15,9 +15,14 @@ const { authenticateToken, requireAdmin } = require('./middleware');
 const { getCertificate } = require('./acme');
 // ACME HTTP-01 challenge route
 router.get('/.well-known/acme-challenge/:token', (req, res) => {
-  if (req.params.token && global.__acmeChallengeValue) {
-    res.send(global.__acmeChallengeValue);
+  const token = req.params.token;
+  const challengeValue = global.__acmeChallengeValue;
+  console.log(`[ACME Challenge] Received request for token: ${token}`);
+  if (token && challengeValue) {
+    console.log(`[ACME Challenge] Responding with challenge value: ${challengeValue}`);
+    res.send(challengeValue);
   } else {
+    console.warn(`[ACME Challenge] Challenge not found for token: ${token}`);
     res.status(404).end();
   }
 });
