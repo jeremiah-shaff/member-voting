@@ -2,6 +2,18 @@ const express = require('express');
 const fs = require('fs');
 const LOG_PATH = process.env.REQUEST_LOG_PATH || './request.log';
 const router = express.Router();
+
+// Auth routes
+
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const path = require('path');
+const multer = require('multer');
+const upload = multer({ dest: path.join(__dirname, 'uploads/') });
+
+const { authenticateToken, requireAdmin } = require('./middleware');
+const { getCertificate } = require('./acme');
+
 // Request logging middleware
 router.use((req, res, next) => {
   const logEntry = `${new Date().toISOString()} ${req.method} ${req.originalUrl} IP:${req.ip}\n`;
@@ -10,18 +22,6 @@ router.use((req, res, next) => {
   });
   next();
 });
-
-// Auth routes
-
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
-const upload = multer({ dest: path.join(__dirname, 'uploads/') });
-
-const { authenticateToken, requireAdmin } = require('./middleware');
-const { getCertificate } = require('./acme');
 
 // Get branding settings
 router.get('/branding', async (req, res) => {
