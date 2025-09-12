@@ -122,7 +122,21 @@ export default function CommitteeManagementPage({ branding }) {
               <ul>
                 {Array.isArray(c.members) && c.members.length > 0 ? (
                   c.members.map(m => (
-                    <li key={m.id} style={{color:'#228'}}>{m.username}</li>
+                    <li key={m.id} style={{color:'#228'}}>
+                      {m.username}
+                      <button style={{marginLeft:'8px', color:'red'}} onClick={async () => {
+                        const token = localStorage.getItem('token');
+                        const res = await apiRequest(`/committees/${c.id}/members/${m.id}`, 'DELETE', null, token);
+                        if (res.success) {
+                          setSuccess('Member removed!');
+                          setError('');
+                          apiRequest('/committees', 'GET', null, token).then(setCommittees);
+                        } else {
+                          setError(res.error || 'Remove failed');
+                          setSuccess('');
+                        }
+                      }}>Remove</button>
+                    </li>
                   ))
                 ) : (
                   <li style={{color:'#888'}}>No members assigned</li>
@@ -138,6 +152,33 @@ export default function CommitteeManagementPage({ branding }) {
                     <button onClick={() => handleAssignMember(c.id, m.id)} style={{marginLeft:'8px'}}>Assign</button>
                   </li>
                 ))}
+              </ul>
+            </div>
+            <div>
+              <h4>Assigned Ballots</h4>
+              <ul>
+                {Array.isArray(ballots) && ballots.length > 0 ? (
+                  ballots.filter(b => Array.isArray(b.committee_ids) && b.committee_ids.includes(c.id)).map(b => (
+                    <li key={b.id} style={{color:'#228'}}>
+                      {b.title}
+                      <button style={{marginLeft:'8px', color:'red'}} onClick={async () => {
+                        const token = localStorage.getItem('token');
+                        const res = await apiRequest(`/ballots/${b.id}/committees/${c.id}`, 'DELETE', null, token);
+                        if (res.success) {
+                          setSuccess('Ballot removed!');
+                          setError('');
+                          apiRequest('/committees', 'GET', null, token).then(setCommittees);
+                          apiRequest('/ballots', 'GET', null, token).then(setBallots);
+                        } else {
+                          setError(res.error || 'Remove failed');
+                          setSuccess('');
+                        }
+                      }}>Remove</button>
+                    </li>
+                  ))
+                ) : (
+                  <li style={{color:'#888'}}>No ballots assigned</li>
+                )}
               </ul>
             </div>
             <div>
