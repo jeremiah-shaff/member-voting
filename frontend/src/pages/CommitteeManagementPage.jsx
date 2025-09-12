@@ -120,7 +120,7 @@ export default function CommitteeManagementPage({ branding }) {
             <div>
               <h4>Assigned Members</h4>
               <ul>
-                {c.members && c.members.length > 0 ? (
+                {Array.isArray(c.members) && c.members.length > 0 ? (
                   c.members.map(m => (
                     <li key={m.id} style={{color:'#228'}}>{m.username}</li>
                   ))

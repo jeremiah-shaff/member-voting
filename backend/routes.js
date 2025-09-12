@@ -1,3 +1,4 @@
+
 // Endpoint to check certificate expiration
 
 const path = require('path');
@@ -120,6 +121,42 @@ router.post('/branding/icon', authenticateToken, requireAdmin, upload.single('ic
     res.json({ icon_path: iconPath });
   } catch (err) {
     res.status(500).json({ error: 'Failed to upload icon' });
+  }
+});
+
+// Admin: rename committee
+router.put('/committees/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const committeeId = req.params.id;
+  const { name, description } = req.body;
+  if (!name) return res.status(400).json({ error: 'Committee name required' });
+  try {
+    const pool = req.pool;
+    const result = await pool.query(
+      'UPDATE committees SET name = $1, description = $2 WHERE id = $3 RETURNING *',
+      [name, description || '', committeeId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Committee not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update committee' });
+  }
+});
+
+// Admin: delete committee
+router.delete('/committees/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const committeeId = req.params.id;
+  try {
+    const pool = req.pool;
+    // Remove member assignments
+    await pool.query('DELETE FROM member_committees WHERE committee_id = $1', [committeeId]);
+    // Remove ballot assignments
+    await pool.query('DELETE FROM ballot_committees WHERE committee_id = $1', [committeeId]);
+    // Remove the committee itself
+    const result = await pool.query('DELETE FROM committees WHERE id = $1 RETURNING id', [committeeId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Committee not found' });
+    res.json({ success: true, deleted_committee_id: committeeId });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete committee' });
   }
 });
 
