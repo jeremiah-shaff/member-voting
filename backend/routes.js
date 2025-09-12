@@ -449,32 +449,35 @@ router.put('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => 
       // Get existing measures
       const existingMeasuresRes = await pool.query('SELECT id, measure_text, measure_description FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
       const existingMeasures = existingMeasuresRes.rows;
-      // Parse incoming measures
+      // Parse incoming measures (support {id, title, description} or string)
       const parsedMeasures = measures.map(measure => {
-        let title = measure;
-        let desc = '';
-        if (typeof measure === 'string' && measure.includes('||')) {
-          [title, desc] = measure.split('||');
+        if (typeof measure === 'object' && measure !== null && 'id' in measure) {
+          return { id: measure.id, title: measure.title, desc: measure.description };
+        } else {
+          let title = measure;
+          let desc = '';
+          if (typeof measure === 'string' && measure.includes('||')) {
+            [title, desc] = measure.split('||');
+          }
+          return { title, desc };
         }
-        return { title, desc };
       });
-      // Update existing measures, add new ones, and remove missing ones
-      // 1. Update or add
-      for (let i = 0; i < parsedMeasures.length; i++) {
-        const pm = parsedMeasures[i];
-        if (existingMeasures[i]) {
+      // Track IDs to keep
+      const incomingIds = parsedMeasures.filter(m => m.id).map(m => m.id);
+      // 1. Update existing measures by ID
+      for (const pm of parsedMeasures) {
+        if (pm.id) {
           // Update
-          await pool.query('UPDATE ballot_measures SET measure_text = $1, measure_description = $2 WHERE id = $3', [pm.title, pm.desc, existingMeasures[i].id]);
+          await pool.query('UPDATE ballot_measures SET measure_text = $1, measure_description = $2 WHERE id = $3', [pm.title, pm.desc, pm.id]);
         } else {
           // Add new
           await pool.query('INSERT INTO ballot_measures (ballot_id, measure_text, measure_description) VALUES ($1, $2, $3)', [ballotId, pm.title, pm.desc]);
         }
       }
-      // 2. Remove extra existing measures
-      if (existingMeasures.length > parsedMeasures.length) {
-        const toRemove = existingMeasures.slice(parsedMeasures.length);
-        for (const m of toRemove) {
-          await pool.query('DELETE FROM ballot_measures WHERE id = $1', [m.id]);
+      // 2. Remove measures not present in incoming
+      for (const em of existingMeasures) {
+        if (!incomingIds.includes(em.id)) {
+          await pool.query('DELETE FROM ballot_measures WHERE id = $1', [em.id]);
         }
       }
     }
