@@ -55,6 +55,15 @@ export default function EditBallotPage({ branding }) {
   const handleSubmit = async e => {
     e.preventDefault();
     const token = localStorage.getItem('token');
+    // Send measures as objects with id, title, description if id exists
+    const formattedMeasures = measures.filter(m => m.title && m.title.trim()).map((m, idx) => {
+      const measureId = ballot.measures && ballot.measures[idx] && ballot.measures[idx].id;
+      if (measureId) {
+        return { id: measureId, title: m.title, description: m.description };
+      } else {
+        return { title: m.title, description: m.description };
+      }
+    });
     const res = await apiRequest(`/ballots/${id}`, 'PUT', {
       title: ballot.title,
       description: ballot.description,
@@ -62,8 +71,7 @@ export default function EditBallotPage({ branding }) {
       end_time: ballot.end_time,
       quorum: Number(ballot.quorum),
       acceptance_threshold: Number(ballot.acceptance_threshold),
-      measures: measures.filter(m => m.title && m.title.trim()).map(m => `${m.title}||${m.description || ''}`),
-      committee_ids: selectedCommittee ? [selectedCommittee] : []
+      measures: formattedMeasures
     }, token);
     if (res.id) {
       setSuccess('Ballot updated!');

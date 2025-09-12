@@ -1,4 +1,3 @@
-
 // Endpoint to check certificate expiration
 
 const path = require('path');
@@ -365,18 +364,19 @@ router.get('/ballots', authenticateToken, async (req, res) => {
       GROUP BY b.id
       ORDER BY b.id
     `);
-    // If admin, show all ballots
-    if (req.user.is_admin) {
-      return res.json(ballotsWithCommittees.rows);
-    }
     // Get member's committees
     const commRes = await pool.query('SELECT committee_id FROM member_committees WHERE member_id = $1', [req.user.id]);
     const committeeIds = commRes.rows.map(r => r.committee_id);
     // Filter ballots: assigned to member's committees or open to all
-    let visibleBallots = ballotsWithCommittees.rows.filter(b => {
+    let visibleBallots = ballotsWithCommittees.rows.map(b => {
       const assignedCommitteeIds = Array.isArray(b.committee_ids) ? b.committee_ids.filter(id => id !== null) : [];
-      if (assignedCommitteeIds.length === 0) return true; // open to all
-      return assignedCommitteeIds.some(id => committeeIds.includes(id));
+      let is_visible = false;
+      if (assignedCommitteeIds.length === 0) {
+        is_visible = true; // open to all
+      } else {
+        is_visible = assignedCommitteeIds.some(id => committeeIds.includes(id));
+      }
+      return { ...b, is_visible };
     });
     // For each visible ballot, check if user has voted
     const ballotIds = visibleBallots.map(b => b.id);
@@ -391,6 +391,10 @@ router.get('/ballots', authenticateToken, async (req, res) => {
       });
     }
     visibleBallots = visibleBallots.map(b => ({ ...b, has_voted: !!votedMap[b.id] }));
+    // Filter out ballots for non-admins where is_visible is false
+    if (!req.user.is_admin) {
+      visibleBallots = visibleBallots.filter(b => b.is_visible);
+    }
     res.json(visibleBallots);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list ballots' });
@@ -451,8 +455,13 @@ router.put('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => 
       const existingMeasures = existingMeasuresRes.rows;
       // Parse incoming measures (support {id, title, description} or string)
       const parsedMeasures = measures.map(measure => {
-        if (typeof measure === 'object' && measure !== null && 'id' in measure) {
-          return { id: measure.id, title: measure.title, desc: measure.description };
+        if (typeof measure === 'object' && measure !== null) {
+          // Accept {id, title, description} or {title, description}
+          return {
+            id: measure.id,
+            title: measure.title || '',
+            desc: measure.description || ''
+          };
         } else {
           let title = measure;
           let desc = '';
