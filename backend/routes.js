@@ -17,14 +17,9 @@ const { getCertificate } = require('./acme');
 router.get('/.well-known/acme-challenge/:token', (req, res) => {
   const token = req.params.token;
   const challengeValue = global.__acmeChallengeMap[token];
-  console.log(`[ACME Challenge] Token: ${token}`);
   if (challengeValue) {
-    console.log(`[ACME Challenge] Value (raw): '${challengeValue}'`);
-    console.log(`[ACME Challenge] Value (Buffer):`, Buffer.from(challengeValue).toString('utf8'));
-    res.set('Content-Type', 'text/plain');
     res.status(200).send(challengeValue);
   } else {
-    console.warn(`[ACME Challenge] Challenge not found for token: ${token}`);
     res.status(404).send('Challenge token not found');
   }
 });
