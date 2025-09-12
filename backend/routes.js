@@ -169,8 +169,10 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
 
     // Update nginx config with new cert paths and add HTTPS block if missing
     const nginxConfPath = '/etc/nginx/sites-available/member-voting';
-    const privkeyPath = '/opt/member-voting/backend/certs/privkey.pem';
-    const certPath = '/opt/member-voting/backend/certs/cert.pem';
+  const appDir = process.env.APP_DIR || '/opt/member-voting';
+  const certDir = process.env.CERT_DIR || path.join(appDir, 'backend/certs');
+  const privkeyPath = path.join(certDir, 'privkey.pem');
+  const certPath = path.join(certDir, 'cert.pem');
     let conf = '';
     try {
       conf = fs.readFileSync(nginxConfPath, 'utf8');
@@ -183,7 +185,8 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
   const httpBlock = `server {\n    listen 80;\n    server_name ${fqdn};\n    location /.well-known/acme-challenge/ {\n        proxy_pass http://localhost:4000/api/.well-known/acme-challenge/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location / {\n        return 301 https://$host$request_uri;\n    }\n}`;
 
   // HTTPS block as before
-  const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root /opt/member-voting/frontend/dist;\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
+  const frontendDist = path.join(appDir, 'frontend/dist');
+  const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root ${frontendDist};\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
 
   // Remove any existing port 80 block
   conf = conf.replace(/server\s*\{[^}]*listen 80;[^}]*\}/gs, '');
@@ -212,6 +215,64 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
     setTimeout(() => process.exit(0), 1000); // Give response time to flush
   } catch (err) {
     res.status(500).json({ error: err.message || 'Certificate request failed' });
+  }
+});
+
+// Admin: rebuild nginx config for HTTPS with existing certificate files
+router.post('/rebuild-nginx-config', authenticateToken, requireAdmin, async (req, res) => {
+  // Use FQDN from branding table
+  try {
+    const pool = req.pool;
+    const brandingResult = await pool.query('SELECT fqdn FROM branding ORDER BY id DESC LIMIT 1');
+    const branding = brandingResult.rows[0];
+    if (!branding || !branding.fqdn) {
+      return res.status(400).json({ error: 'FQDN not set in branding' });
+    }
+    const fqdn = branding.fqdn;
+    const nginxConfPath = '/etc/nginx/sites-available/member-voting';
+  const appDir = process.env.APP_DIR || '/opt/member-voting';
+  const certDir = process.env.CERT_DIR || path.join(appDir, 'backend/certs');
+  const privkeyPath = path.join(certDir, 'privkey.pem');
+  const certPath = path.join(certDir, 'cert.pem');
+    // Check cert files exist
+    if (!fs.existsSync(certPath) || !fs.existsSync(privkeyPath)) {
+      return res.status(400).json({ error: 'Certificate files not found. Please request a certificate first.' });
+    }
+    let conf = '';
+    try {
+      conf = fs.readFileSync(nginxConfPath, 'utf8');
+    } catch (err) {
+      console.error(`[NGINX] Failed to read config: ${nginxConfPath}`);
+      throw err;
+    }
+    // Port 80 block: only allow ACME challenge, redirect all else to HTTPS
+    const httpBlock = `server {\n    listen 80;\n    server_name ${fqdn};\n    location /.well-known/acme-challenge/ {\n        proxy_pass http://localhost:4000/api/.well-known/acme-challenge/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location / {\n        return 301 https://$host$request_uri;\n    }\n}`;
+    // HTTPS block
+  const frontendDist = path.join(appDir, 'frontend/dist');
+  const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root ${frontendDist};\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
+    // Remove any existing port 80 block
+    conf = conf.replace(/server\s*\{[^}]*listen 80;[^}]*\}/gs, '');
+    // Remove any existing HTTPS block
+    conf = conf.replace(/server\s*\{[^}]*listen 443 ssl;[^}]*\}/gs, '');
+    // Append new blocks
+    conf += '\n\n' + httpBlock + '\n\n' + httpsBlock + '\n';
+    try {
+      fs.writeFileSync(nginxConfPath, conf, 'utf8');
+      console.log('[NGINX] Config updated with existing certificate paths.');
+    } catch (err) {
+      console.error(`[NGINX] Failed to write config: ${nginxConfPath}`);
+      throw err;
+    }
+    exec('sudo nginx -t && sudo systemctl reload nginx', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[NGINX] Reload failed: ${stderr}`);
+      } else {
+        console.log('[NGINX] Reloaded successfully');
+      }
+    });
+    res.json({ success: true, message: `Nginx config rebuilt for HTTPS with existing certificate files for ${fqdn}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to rebuild Nginx config' });
   }
 });
 

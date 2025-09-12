@@ -4,7 +4,7 @@ const path = require('path');
 const acme = require('acme-client');
 require('dotenv').config();
 
-const CERT_DIR = path.join(__dirname, 'certs');
+const CERT_DIR = process.env.CERT_DIR || path.join(__dirname, 'certs');
 function ensureCertDir() {
   try {
     fs.mkdirSync(CERT_DIR, { recursive: true });
