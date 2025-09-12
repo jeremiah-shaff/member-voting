@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api.jsx';
 
-export default function CreateBallotPage({ branding }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -11,6 +10,12 @@ export default function CreateBallotPage({ branding }) {
   const [measures, setMeasures] = useState([{ title: '', description: '' }]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [committees, setCommittees] = useState([]);
+  const [selectedCommittee, setSelectedCommittee] = useState('');
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    apiRequest('/committees', 'GET', null, token).then(setCommittees);
+  }, []);
 
   const handleMeasureChange = (idx, value) => {
     setMeasures(m => m.map((v, i) => i === idx ? value : v));
@@ -22,7 +27,7 @@ export default function CreateBallotPage({ branding }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const res = await apiRequest('/ballots', 'POST', {
+    const ballotRes = await apiRequest('/ballots', 'POST', {
       title,
       description,
       start_time: startTime,
@@ -31,11 +36,20 @@ export default function CreateBallotPage({ branding }) {
       acceptance_threshold: Number(acceptanceThreshold),
       measures: measures.filter(m => m.title && m.title.trim()).map(m => `${m.title}||${m.description || ''}`)
     }, token);
-    if (res.ballot_id) {
+    if (ballotRes.ballot_id) {
+      // Optionally assign to committee
+      if (selectedCommittee) {
+        const assignRes = await apiRequest(`/ballots/${ballotRes.ballot_id}/committees`, 'POST', { committee_id: selectedCommittee }, token);
+        if (!assignRes.success) {
+          setError(assignRes.error || 'Ballot created, but committee assignment failed');
+          setSuccess('');
+          return;
+        }
+      }
       setSuccess('Ballot created!');
       setError('');
     } else {
-      setError(res.error || 'Creation failed');
+      setError(ballotRes.error || 'Creation failed');
       setSuccess('');
     }
   };
@@ -43,7 +57,15 @@ export default function CreateBallotPage({ branding }) {
   return (
     <div>
       <h2>Create Ballot</h2>
-      <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'16px', maxWidth:'500px', margin:'0 auto'}}>
+  <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'16px', maxWidth:'500px', margin:'0 auto'}}>
+        <label>Assign to Committee (optional)<br />
+          <select value={selectedCommittee} onChange={e => setSelectedCommittee(e.target.value)} style={{width:'100%'}}>
+            <option value="">Open to all members</option>
+            {committees.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </label>
         <label>Ballot Title<br />
           <input placeholder="Title of the ballot (e.g. Board Elections)" value={title} onChange={e => setTitle(e.target.value)} style={{width:'100%'}} />
         </label>
@@ -82,4 +104,4 @@ export default function CreateBallotPage({ branding }) {
       {success && <div style={{color:'green'}}>{success}</div>}
     </div>
   );
-}
+

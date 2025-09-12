@@ -40,6 +40,9 @@ export default function CommitteeManagementPage({ branding }) {
     if (res.success) {
       setSuccess('Member assigned!');
       setError('');
+      // Refresh committees and members
+      apiRequest('/committees', 'GET', null, token).then(setCommittees);
+      apiRequest('/members', 'GET', null, token).then(setMembers);
     } else {
       setError(res.error || 'Assign failed');
       setSuccess('');
@@ -52,6 +55,9 @@ export default function CommitteeManagementPage({ branding }) {
     if (res.success) {
       setSuccess('Ballot assigned!');
       setError('');
+      // Refresh committees and ballots
+      apiRequest('/committees', 'GET', null, token).then(setCommittees);
+      apiRequest('/ballots', 'GET', null, token).then(setBallots);
     } else {
       setError(res.error || 'Assign failed');
       setSuccess('');
@@ -146,12 +152,15 @@ export default function CommitteeManagementPage({ branding }) {
             <div>
               <h4>Assign Members</h4>
               <ul>
-                {members.map(m => (
+                {members.filter(m => !(Array.isArray(c.members) && c.members.some(cm => cm.id === m.id))).map(m => (
                   <li key={m.id}>
                     {m.username}
                     <button onClick={() => handleAssignMember(c.id, m.id)} style={{marginLeft:'8px'}}>Assign</button>
                   </li>
                 ))}
+                {members.filter(m => !(Array.isArray(c.members) && c.members.some(cm => cm.id === m.id))).length === 0 && (
+                  <li style={{color:'#888'}}>All members assigned</li>
+                )}
               </ul>
             </div>
             <div>
@@ -184,12 +193,15 @@ export default function CommitteeManagementPage({ branding }) {
             <div>
               <h4>Assign Ballots</h4>
               <ul>
-                {ballots.map(b => (
+                {ballots.filter(b => !(Array.isArray(b.committee_ids) && b.committee_ids.includes(c.id))).map(b => (
                   <li key={b.id}>
                     {b.title}
                     <button onClick={() => handleAssignBallot(c.id, b.id)} style={{marginLeft:'8px'}}>Assign</button>
                   </li>
                 ))}
+                {ballots.filter(b => !(Array.isArray(b.committee_ids) && b.committee_ids.includes(c.id))).length === 0 && (
+                  <li style={{color:'#888'}}>All ballots assigned</li>
+                )}
               </ul>
             </div>
           </li>
