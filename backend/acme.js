@@ -25,11 +25,19 @@ async function getCertificate(fqdn) {
     challengeCreateFn: async (authz, challenge, keyAuthorization) => {
       if (challenge && challenge.token) {
         global.__acmeChallengeMap[challenge.token] = keyAuthorization;
+        // Write challenge to file for Nginx
+        const challengeDir = path.join(__dirname, '../frontend/public/.well-known/acme-challenge');
+        if (!fs.existsSync(challengeDir)) fs.mkdirSync(challengeDir, { recursive: true });
+        fs.writeFileSync(path.join(challengeDir, challenge.token), keyAuthorization, { encoding: 'utf8' });
       }
     },
     challengeRemoveFn: async (authz, challenge) => {
       if (challenge && challenge.token) {
         delete global.__acmeChallengeMap[challenge.token];
+        // Remove challenge file
+        const challengeDir = path.join(__dirname, '../frontend/public/.well-known/acme-challenge');
+        const filePath = path.join(challengeDir, challenge.token);
+        // if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     }
   });
