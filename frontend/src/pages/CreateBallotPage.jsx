@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api.jsx';
 
+export default function CreateBallotPage({ branding }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -104,4 +105,4 @@ import { apiRequest } from '../api.jsx';
       {success && <div style={{color:'green'}}>{success}</div>}
     </div>
   );
-
+}
