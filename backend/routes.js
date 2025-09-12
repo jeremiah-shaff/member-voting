@@ -217,9 +217,9 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
 
 // Register member or admin
 router.post('/auth/register', async (req, res) => {
-  const { username, password, is_admin } = req.body;
+  let { username, password, is_admin } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-    username = username.toLowerCase(); // Make username case insensitive
+  username = username.toLowerCase(); // Make username case insensitive
   try {
     const pool = req.pool;
     const hash = await bcrypt.hash(password, 10);
@@ -240,9 +240,9 @@ router.post('/auth/register', async (req, res) => {
 
 // Login member or admin
 router.post('/auth/login', async (req, res) => {
-  const { username, password } = req.body;
+  let { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-    username = username.toLowerCase(); // Make username case insensitive
+  username = username.toLowerCase(); // Make username case insensitive
   try {
     const pool = req.pool;
     const result = await pool.query('SELECT * FROM members WHERE username = $1', [username]);
@@ -502,7 +502,7 @@ router.get('/members', authenticateToken, requireAdmin, async (req, res) => {
 
 // Admin: add member
 router.post('/members', authenticateToken, requireAdmin, async (req, res) => {
-  const { username, password, is_admin } = req.body;
+  let { username, password, is_admin } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   username = username.toLowerCase(); // Make username case insensitive
   try {
@@ -525,10 +525,11 @@ router.post('/members', authenticateToken, requireAdmin, async (req, res) => {
 // Admin: edit member (username, password, admin status)
 router.put('/members/:id', authenticateToken, requireAdmin, async (req, res) => {
   const memberId = req.params.id;
-  const { username, password, is_admin } = req.body;
+  let { username, password, is_admin } = req.body;
   try {
     const pool = req.pool;
     let query = 'UPDATE members SET ';
+    username = username.toLowerCase(); // Make username case insensitive
     let params = [];
     let updates = [];
     if (username) { updates.push('username = $' + (params.length+1)); params.push(username); }
