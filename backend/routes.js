@@ -256,22 +256,30 @@ router.post('/ballots', authenticateToken, requireAdmin, async (req, res) => {
 router.get('/ballots', authenticateToken, async (req, res) => {
   try {
     const pool = req.pool;
+    // Get all ballots and their committee assignments
+    const ballotsWithCommittees = await pool.query(`
+      SELECT b.*, array_agg(c.name) AS committee_names
+      FROM ballots b
+      LEFT JOIN ballot_committees bc ON b.id = bc.ballot_id
+      LEFT JOIN committees c ON bc.committee_id = c.id
+      GROUP BY b.id
+      ORDER BY b.id
+    `);
+    // If admin, show all ballots
+    if (req.user.is_admin) {
+      return res.json(ballotsWithCommittees.rows);
+    }
     // Get member's committees
     const commRes = await pool.query('SELECT committee_id FROM member_committees WHERE member_id = $1', [req.user.id]);
     const committeeIds = commRes.rows.map(r => r.committee_id);
-    // Get ballots for those committees
-    let ballotsRes;
-    if (committeeIds.length > 0) {
-      ballotsRes = await pool.query(
-        `SELECT b.* FROM ballots b
-         JOIN ballot_committees bc ON b.id = bc.ballot_id
-         WHERE bc.committee_id = ANY($1::int[])`,
-        [committeeIds]
-      );
-    } else {
-      ballotsRes = { rows: [] };
-    }
-    res.json(ballotsRes.rows);
+    // Filter ballots: assigned to member's committees or open to all
+    const visibleBallots = ballotsWithCommittees.rows.filter(b => {
+      const assignedCommittees = b.committee_names.filter(n => n);
+      if (assignedCommittees.length === 0) return true; // open to all
+      // If any assigned committee is in member's committees
+      return b.committee_names.some(name => name && committeeIds.includes(bc => bc.name === name));
+    });
+    res.json(visibleBallots);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list ballots' });
   }
