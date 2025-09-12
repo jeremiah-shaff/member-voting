@@ -40,16 +40,7 @@ export default function AdminDashboard({ branding }) {
       {error && <div style={{color:'red'}}>{error}</div>}
       <ul>
         {ballots.map(b => {
-          // Ballot committee membership check for admin
-          let adminIsCommitteeMember = true;
-          if (Array.isArray(b.committee_ids) && b.committee_ids.length > 0) {
-            const adminCommittees = (localStorage.getItem('committee_ids') || '').split(',').map(Number).filter(Boolean);
-            // Only disable if ballot is assigned to committees and admin is not in any
-            adminIsCommitteeMember = b.committee_ids.some(cid => adminCommittees.includes(cid));
-          } else {
-            // Ballot is open to all members, so allow edit
-            adminIsCommitteeMember = true;
-          }
+          // Disable Edit button if is_visible is false
           return (
             <li key={b.id}>
               {b.title}
@@ -62,8 +53,8 @@ export default function AdminDashboard({ branding }) {
               <a href={`/admin/edit-ballot/${b.id}`}>
                 <button
                   style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}
-                  disabled={!adminIsCommitteeMember}
-                  title={!adminIsCommitteeMember ? 'You are not a member of the relevant committee' : ''}
+                  disabled={b.is_visible === false}
+                  title={b.is_visible === false ? 'You are not a member of the relevant committee' : ''}
                 >Edit</button>
               </a>
               <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
