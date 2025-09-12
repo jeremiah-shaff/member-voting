@@ -182,6 +182,7 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
 router.post('/auth/register', async (req, res) => {
   const { username, password, is_admin } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+    username = username.toLowerCase(); // Make username case insensitive
   try {
     const pool = req.pool;
     const hash = await bcrypt.hash(password, 10);
@@ -204,6 +205,7 @@ router.post('/auth/register', async (req, res) => {
 router.post('/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+    username = username.toLowerCase(); // Make username case insensitive
   try {
     const pool = req.pool;
     const result = await pool.query('SELECT * FROM members WHERE username = $1', [username]);
@@ -256,9 +258,9 @@ router.post('/ballots', authenticateToken, requireAdmin, async (req, res) => {
 router.get('/ballots', authenticateToken, async (req, res) => {
   try {
     const pool = req.pool;
-    // Get all ballots and their committee assignments
+    // Get all ballots and their committee assignments (both IDs and names)
     const ballotsWithCommittees = await pool.query(`
-      SELECT b.*, array_agg(c.name) AS committee_names
+      SELECT b.*, array_agg(c.name) AS committee_names, array_agg(c.id) AS committee_ids
       FROM ballots b
       LEFT JOIN ballot_committees bc ON b.id = bc.ballot_id
       LEFT JOIN committees c ON bc.committee_id = c.id
@@ -274,10 +276,11 @@ router.get('/ballots', authenticateToken, async (req, res) => {
     const committeeIds = commRes.rows.map(r => r.committee_id);
     // Filter ballots: assigned to member's committees or open to all
     const visibleBallots = ballotsWithCommittees.rows.filter(b => {
-      const assignedCommittees = b.committee_names.filter(n => n);
-      if (assignedCommittees.length === 0) return true; // open to all
+      // committee_ids may contain nulls if ballot is open to all
+      const assignedCommitteeIds = Array.isArray(b.committee_ids) ? b.committee_ids.filter(id => id !== null) : [];
+      if (assignedCommitteeIds.length === 0) return true; // open to all
       // If any assigned committee is in member's committees
-      return b.committee_names.some(name => name && committeeIds.includes(bc => bc.name === name));
+      return assignedCommitteeIds.some(id => committeeIds.includes(id));
     });
     res.json(visibleBallots);
   } catch (err) {
@@ -464,6 +467,7 @@ router.get('/members', authenticateToken, requireAdmin, async (req, res) => {
 router.post('/members', authenticateToken, requireAdmin, async (req, res) => {
   const { username, password, is_admin } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  username = username.toLowerCase(); // Make username case insensitive
   try {
     const pool = req.pool;
     const hash = await bcrypt.hash(password, 10);
@@ -576,8 +580,26 @@ router.post('/ballots/:id/committees', authenticateToken, requireAdmin, async (r
 router.get('/committees', authenticateToken, async (req, res) => {
   try {
     const pool = req.pool;
-    const result = await pool.query('SELECT * FROM committees');
-    res.json(result.rows);
+    // Get all committees
+    const committeesRes = await pool.query('SELECT * FROM committees');
+    const committees = committeesRes.rows;
+    // Get all member assignments
+    const memberAssignmentsRes = await pool.query(`
+      SELECT mc.committee_id, m.id as member_id, m.username
+      FROM member_committees mc
+      JOIN members m ON mc.member_id = m.id
+    `);
+    // Map committee_id to members
+    const committeeMembersMap = {};
+    memberAssignmentsRes.rows.forEach(row => {
+      if (!committeeMembersMap[row.committee_id]) committeeMembersMap[row.committee_id] = [];
+      committeeMembersMap[row.committee_id].push({ id: row.member_id, username: row.username });
+    });
+    // Attach members to each committee
+    committees.forEach(c => {
+      c.members = committeeMembersMap[c.id] || [];
+    });
+    res.json(committees);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list committees' });
   }

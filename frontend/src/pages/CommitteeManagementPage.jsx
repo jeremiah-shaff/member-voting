@@ -118,6 +118,18 @@ export default function CommitteeManagementPage({ branding }) {
               </form>
             )}
             <div>
+              <h4>Assigned Members</h4>
+              <ul>
+                {c.members && c.members.length > 0 ? (
+                  c.members.map(m => (
+                    <li key={m.id} style={{color:'#228'}}>{m.username}</li>
+                  ))
+                ) : (
+                  <li style={{color:'#888'}}>No members assigned</li>
+                )}
+              </ul>
+            </div>
+            <div>
               <h4>Assign Members</h4>
               <ul>
                 {members.map(m => (
