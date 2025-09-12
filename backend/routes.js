@@ -455,7 +455,7 @@ router.put('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => 
       const existingMeasures = existingMeasuresRes.rows;
       // Parse incoming measures (support {id, title, description} or string)
       const parsedMeasures = measures.map(measure => {
-        if (typeof measure === 'object' && measure !== null) {
+        if (measure !== null) {
           // Accept {id, title, description} or {title, description}
           return {
             id: measure.id,

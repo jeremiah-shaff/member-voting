@@ -36,7 +36,7 @@ export default function AdminDashboard({ branding }) {
 
   return (
     <div>
-      <h2>Admin Dashboard</h2>
+      <h2>Ballot Reports</h2>
       {error && <div style={{color:'red'}}>{error}</div>}
       <ul>
         {ballots.map(b => {
@@ -53,8 +53,8 @@ export default function AdminDashboard({ branding }) {
               <a href={`/admin/edit-ballot/${b.id}`}>
                 <button
                   style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}
-                  disabled={b.is_visible === false}
-                  title={b.is_visible === false ? 'You are not a member of the relevant committee' : ''}
+                  disabled={!b.is_visible}
+                  title={!b.is_visible ? 'You are not a member of the relevant committee' : ''}
                 >Edit</button>
               </a>
               <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
