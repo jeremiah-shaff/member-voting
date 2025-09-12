@@ -106,14 +106,14 @@ export default function MemberManagementPage({ branding }) {
                 {editId === m.id ? (
                   <>
                     <input type="password" placeholder="New password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
-                    <button onClick={handleUpdate} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Save</button>
+                    <button onClick={handleUpdate} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginRight:'8px'}}>Save</button>
                     <button onClick={() => setEditId(null)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Cancel</button>
                   </>
                 ) : (
-                  <>
+                  <div style={{display:'flex', gap:'8px'}}>
                     <button onClick={() => handleEdit(m)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Edit</button>
                     <button onClick={() => handleDelete(m.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Delete</button>
-                  </>
+                  </div>
                 )}
               </td>
             </tr>

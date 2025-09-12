@@ -33,6 +33,14 @@ export default function BallotDetailPage({ branding }) {
 
   if (!ballot) return <div>Loading...</div>;
 
+  // Ballot expired logic
+  let expired = false;
+  if (ballot.end_time) {
+    const now = new Date();
+    const end = new Date(ballot.end_time);
+    expired = end <= now;
+  }
+
   return (
     <div>
       <h2>{ballot.title}</h2>
@@ -45,7 +53,7 @@ export default function BallotDetailPage({ branding }) {
           <div key={m.id} style={{marginBottom: '16px'}}>
             <label><strong>{m.measure_text}</strong></label><br />
             {m.measure_description && <div style={{fontStyle:'italic', color:'#555'}}>{m.measure_description}</div>}
-            <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))} disabled={ballot.has_voted}>
+            <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))} disabled={ballot.has_voted || expired}>
               <option value="">Select</option>
               <option value="yes">Yes</option>
               <option value="no">No</option>
@@ -53,8 +61,16 @@ export default function BallotDetailPage({ branding }) {
             </select>
           </div>
         ))}
-  <button type="submit" disabled={ballot.has_voted} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Submit Vote</button>
+        <button
+          type="submit"
+          disabled={ballot.has_voted || expired}
+          style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}
+          title={expired ? 'This ballot is expired and cannot be voted on.' : ballot.has_voted ? 'You have already voted.' : ''}
+        >Submit Vote</button>
       </form>
+      {expired && (
+        <div style={{color:'red', fontWeight:'bold', marginTop:'1em'}}>This ballot is expired and cannot be voted on.</div>
+      )}
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}
     </div>
