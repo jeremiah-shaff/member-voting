@@ -29,16 +29,33 @@ export default function BallotListPage({ branding }) {
       <h2>Ballots</h2>
       {error && <div style={{color:'red'}}>{error}</div>}
       <ul>
-        {ballots.map(b => (
-          <li key={b.id}>
-            <a href={`/ballots/${b.id}`}>{b.title}</a>
-            <span style={{marginLeft:'12px', fontStyle:'italic', color:'#666'}}>
-              {Array.isArray(b.committee_names) && b.committee_names.filter(n => n).length > 0
-                ? `Assigned to: ${b.committee_names.filter(n => n).join(', ')}`
-                : 'Open to all members'}
-            </span>
-          </li>
-        ))}
+        {ballots.map(b => {
+          // Ballot expired logic for admin
+          let expired = false;
+          if (isAdmin && b.end_time) {
+            const now = new Date();
+            const end = new Date(b.end_time);
+            expired = end <= now;
+          }
+          return (
+            <li key={b.id}>
+              <a href={`/ballots/${b.id}`}>{b.title}</a>
+              <span style={{marginLeft:'12px', fontStyle:'italic', color:'#666'}}>
+                {Array.isArray(b.committee_names) && b.committee_names.filter(n => n).length > 0
+                  ? `Assigned to: ${b.committee_names.filter(n => n).join(', ')}`
+                  : 'Open to all members'}
+              </span>
+              {/* Show voted status for members */}
+              {!isAdmin && b.has_voted && (
+                <span style={{marginLeft:'12px', color:'green', fontWeight:'bold'}}>Voted</span>
+              )}
+              {/* Show expired status for admins */}
+              {isAdmin && expired && (
+                <span style={{marginLeft:'12px', color:'red', fontWeight:'bold'}}>Expired</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

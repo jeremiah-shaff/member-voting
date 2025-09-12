@@ -1,3 +1,26 @@
+// Admin: remove member from committee
+router.delete('/committees/:committeeId/members/:memberId', authenticateToken, requireAdmin, async (req, res) => {
+  const { committeeId, memberId } = req.params;
+  try {
+    const pool = req.pool;
+    await pool.query('DELETE FROM member_committees WHERE committee_id = $1 AND member_id = $2', [committeeId, memberId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove member from committee' });
+  }
+});
+
+// Admin: remove ballot from committee
+router.delete('/ballots/:ballotId/committees/:committeeId', authenticateToken, requireAdmin, async (req, res) => {
+  const { ballotId, committeeId } = req.params;
+  try {
+    const pool = req.pool;
+    await pool.query('DELETE FROM ballot_committees WHERE ballot_id = $1 AND committee_id = $2', [ballotId, committeeId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove ballot from committee' });
+  }
+});
 
 // Endpoint to check certificate expiration
 
