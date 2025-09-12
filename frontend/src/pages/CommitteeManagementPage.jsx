@@ -109,22 +109,29 @@ export default function CommitteeManagementPage({ branding }) {
         <button type="submit" style={{background: branding?.button_color || '#007bff', color: branding?.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop:'8px'}}>Create Committee</button>
       </form>
       <h3>Committees</h3>
-      <ul>
+      <ul style={{listStyle:'none', padding:0}}>
         {committees.map(c => (
-          <li key={c.id}>
-            <strong>{c.name}</strong> - {c.description}
-            <button style={{marginLeft:'8px'}} onClick={() => handleEditCommittee(c)}>Rename</button>
-            <button style={{marginLeft:'8px', color:'red'}} onClick={() => handleDeleteCommittee(c.id)}>Delete</button>
+          <li key={c.id} style={{marginBottom:'32px', border:'2px solid #007bff', borderRadius:'12px', boxShadow:'0 2px 8px rgba(0,0,0,0.07)', padding:'20px', background:'#f8faff'}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+              <div>
+                <strong style={{fontSize:'1.2em'}}>{c.name}</strong>
+                <span style={{marginLeft:'12px', color:'#555'}}>{c.description}</span>
+              </div>
+              <div>
+                <button style={{marginLeft:'8px'}} onClick={() => handleEditCommittee(c)}>Rename</button>
+                <button style={{marginLeft:'8px', color:'red'}} onClick={() => handleDeleteCommittee(c.id)}>Delete</button>
+              </div>
+            </div>
             {editCommitteeId === c.id && (
-              <form onSubmit={handleUpdateCommittee} style={{marginTop:'8px'}}>
+              <form onSubmit={handleUpdateCommittee} style={{marginTop:'8px', display:'flex', gap:'8px', alignItems:'center'}}>
                 <input value={editCommitteeForm.name} onChange={e => setEditCommitteeForm(f => ({...f, name: e.target.value}))} placeholder="New name" />
                 <input value={editCommitteeForm.description} onChange={e => setEditCommitteeForm(f => ({...f, description: e.target.value}))} placeholder="New description" />
                 <button type="submit" style={{marginLeft:'8px'}}>Save</button>
                 <button type="button" style={{marginLeft:'8px'}} onClick={() => setEditCommitteeId(null)}>Cancel</button>
               </form>
             )}
-            <div>
-              <h4>Assigned Members</h4>
+            <div style={{marginTop:'16px'}}>
+              <h4 style={{marginBottom:'4px'}}>Assigned Members</h4>
               <ul>
                 {Array.isArray(c.members) && c.members.length > 0 ? (
                   c.members.map(m => (
@@ -149,8 +156,8 @@ export default function CommitteeManagementPage({ branding }) {
                 )}
               </ul>
             </div>
-            <div>
-              <h4>Assign Members</h4>
+            <div style={{marginTop:'16px'}}>
+              <h4 style={{marginBottom:'4px'}}>Assign Members</h4>
               <ul>
                 {members.filter(m => !(Array.isArray(c.members) && c.members.some(cm => cm.id === m.id))).map(m => (
                   <li key={m.id}>
@@ -163,8 +170,8 @@ export default function CommitteeManagementPage({ branding }) {
                 )}
               </ul>
             </div>
-            <div>
-              <h4>Assigned Ballots</h4>
+            <div style={{marginTop:'16px'}}>
+              <h4 style={{marginBottom:'4px'}}>Assigned Ballots</h4>
               <ul>
                 {Array.isArray(ballots) && ballots.length > 0 ? (
                   ballots.filter(b => Array.isArray(b.committee_ids) && b.committee_ids.includes(c.id)).map(b => (
@@ -190,8 +197,8 @@ export default function CommitteeManagementPage({ branding }) {
                 )}
               </ul>
             </div>
-            <div>
-              <h4>Assign Ballots</h4>
+            <div style={{marginTop:'16px'}}>
+              <h4 style={{marginBottom:'4px'}}>Assign Ballots</h4>
               <ul>
                 {ballots.filter(b => !(Array.isArray(b.committee_ids) && b.committee_ids.includes(c.id))).map(b => (
                   <li key={b.id}>

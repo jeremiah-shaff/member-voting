@@ -44,7 +44,11 @@ export default function AdminDashboard({ branding }) {
           let adminIsCommitteeMember = true;
           if (Array.isArray(b.committee_ids) && b.committee_ids.length > 0) {
             const adminCommittees = (localStorage.getItem('committee_ids') || '').split(',').map(Number);
+            // If ballot is assigned to committees, only enable if admin is in at least one
             adminIsCommitteeMember = b.committee_ids.some(cid => adminCommittees.includes(cid));
+          } else {
+            // Ballot is open to all members, so allow edit
+            adminIsCommitteeMember = true;
           }
           return (
             <li key={b.id}>

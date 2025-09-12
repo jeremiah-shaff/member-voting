@@ -446,18 +446,37 @@ router.put('/ballots/:id', authenticateToken, requireAdmin, async (req, res) => 
 
     // If measures are provided, update them
     if (Array.isArray(measures)) {
-      // Remove existing measures for this ballot
-      await pool.query('DELETE FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
-      // Insert new measures
-      const measurePromises = measures.map(measure => {
+      // Get existing measures
+      const existingMeasuresRes = await pool.query('SELECT id, measure_text, measure_description FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
+      const existingMeasures = existingMeasuresRes.rows;
+      // Parse incoming measures
+      const parsedMeasures = measures.map(measure => {
         let title = measure;
         let desc = '';
         if (typeof measure === 'string' && measure.includes('||')) {
           [title, desc] = measure.split('||');
         }
-        return pool.query('INSERT INTO ballot_measures (ballot_id, measure_text, measure_description) VALUES ($1, $2, $3) RETURNING id, measure_text, measure_description', [ballotId, title, desc]);
+        return { title, desc };
       });
-      await Promise.all(measurePromises);
+      // Update existing measures, add new ones, and remove missing ones
+      // 1. Update or add
+      for (let i = 0; i < parsedMeasures.length; i++) {
+        const pm = parsedMeasures[i];
+        if (existingMeasures[i]) {
+          // Update
+          await pool.query('UPDATE ballot_measures SET measure_text = $1, measure_description = $2 WHERE id = $3', [pm.title, pm.desc, existingMeasures[i].id]);
+        } else {
+          // Add new
+          await pool.query('INSERT INTO ballot_measures (ballot_id, measure_text, measure_description) VALUES ($1, $2, $3)', [ballotId, pm.title, pm.desc]);
+        }
+      }
+      // 2. Remove extra existing measures
+      if (existingMeasures.length > parsedMeasures.length) {
+        const toRemove = existingMeasures.slice(parsedMeasures.length);
+        for (const m of toRemove) {
+          await pool.query('DELETE FROM ballot_measures WHERE id = $1', [m.id]);
+        }
+      }
     }
 
     res.json(result.rows[0]);
