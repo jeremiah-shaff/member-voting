@@ -1,3 +1,4 @@
+const { exec } = require('child_process');
 const express = require('express');
 const fs = require('fs');
 const LOG_PATH = process.env.REQUEST_LOG_PATH || './request.log';
@@ -508,11 +509,50 @@ router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, r
 });
 
 // Admin: request ACME certificate for FQDN
+const { exec } = require('child_process');
 router.post('/request-certificate', authenticateToken, requireAdmin, async (req, res) => {
   const fqdn = req.body.fqdn;
   if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
   try {
     await getCertificate(fqdn);
+
+    // Update nginx config with new cert paths and add HTTPS block if missing
+    const nginxConfPath = '/etc/nginx/sites-available/member-voting';
+    const privkeyPath = '/opt/member-voting/backend/certs/privkey.pem';
+    const certPath = '/opt/member-voting/backend/certs/cert.pem';
+    let conf = '';
+    try {
+      conf = fs.readFileSync(nginxConfPath, 'utf8');
+    } catch (err) {
+      console.error(`[NGINX] Failed to read config: ${nginxConfPath}`);
+      throw err;
+    }
+
+    // Add or update HTTPS server block
+    const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root /opt/member-voting/frontend/dist;\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
+
+    if (!conf.includes('listen 443 ssl;')) {
+      conf += '\n\n' + httpsBlock + '\n';
+    } else {
+      conf = conf.replace(/ssl_certificate\s+[^;]+;/g, `ssl_certificate ${certPath};`);
+      conf = conf.replace(/ssl_certificate_key\s+[^;]+;/g, `ssl_certificate_key ${privkeyPath};`);
+    }
+
+    try {
+      fs.writeFileSync(nginxConfPath, conf, 'utf8');
+      console.log('[NGINX] Config updated with new certificate paths.');
+    } catch (err) {
+      console.error(`[NGINX] Failed to write config: ${nginxConfPath}`);
+      throw err;
+    }
+
+    exec('sudo nginx -t && sudo systemctl reload nginx', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[NGINX] Reload failed: ${stderr}`);
+      } else {
+        console.log('[NGINX] Reloaded successfully');
+      }
+    });
     res.json({ success: true, message: `Certificate successfully obtained for ${fqdn}` });
     setTimeout(() => process.exit(0), 1000); // Give response time to flush
   } catch (err) {

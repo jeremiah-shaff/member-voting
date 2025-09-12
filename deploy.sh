@@ -125,6 +125,8 @@ NGINX
 
 sudo ln -sf /etc/nginx/sites-available/member-voting /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
+sudo mkdir /opt/member-voting/backend/certs
+sudo chown -R $USER:$USER /opt/member-voting/backend/certs
 
 # Optional: Setup HTTPS with Certbot
 # sudo certbot --nginx -d your.domain.com --non-interactive --agree-tos -m admin@your.domain.com
