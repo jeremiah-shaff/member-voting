@@ -11,6 +11,7 @@ POSTGRES_USER="member_voting_user"
 POSTGRES_PASSWORD="securepassword"
 FQDN="your.domain.com"
 ACME_EMAIL="admin@your.domain.com"
+CERT_DIR="/opt/certs"
 
 # Update and install dependencies
 sudo apt update
@@ -62,6 +63,8 @@ DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/$POST
 PORT=4000
 FQDN=$FQDN
 ACME_EMAIL=$ACME_EMAIL
+CERT_DIR=$CERT_DIR
+APP_DIR=$APP_DIR
 ENV
 
 # Setup systemd service for backend
@@ -125,8 +128,8 @@ NGINX
 
 sudo ln -sf /etc/nginx/sites-available/member-voting /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo mkdir /opt/member-voting/backend/certs
-sudo chown -R $USER:$USER /opt/member-voting/backend/certs
+sudo mkdir $CERT_DIR
+sudo chown -R $USER:$USER $CERT_DIR
 
 # Optional: Setup HTTPS with Certbot
 # sudo certbot --nginx -d your.domain.com --non-interactive --agree-tos -m admin@your.domain.com

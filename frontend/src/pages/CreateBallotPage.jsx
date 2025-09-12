@@ -67,29 +67,29 @@ export default function CreateBallotPage({ branding }) {
             ))}
           </select>
         </label>
-        <label>Ballot Title<br />
-          <input placeholder="Title of the ballot (e.g. Board Elections)" value={title} onChange={e => setTitle(e.target.value)} style={{width:'100%'}} />
-        </label>
+          <label>Ballot Title <span style={{color:'red'}}>*</span><br />
+            <input required placeholder="Title of the ballot (e.g. Board Elections)" value={title} onChange={e => setTitle(e.target.value)} style={{width:'100%'}} />
+          </label>
         <label>Ballot Description<br />
           <textarea placeholder="Describe the purpose or context of this ballot" value={description} onChange={e => setDescription(e.target.value)} style={{width:'100%'}} />
         </label>
-        <label>Voting Start Time<br />
-          <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} style={{width:'100%'}} />
-        </label>
-        <label>Voting End Time<br />
-          <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} style={{width:'100%'}} />
-        </label>
+          <label>Voting Start Time <span style={{color:'red'}}>*</span><br />
+            <input required type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} style={{width:'100%'}} />
+          </label>
+          <label>Voting End Time <span style={{color:'red'}}>*</span><br />
+            <input required type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} style={{width:'100%'}} />
+          </label>
         <label>Quorum<br />
           <input type="number" placeholder="Minimum number of votes required" value={quorum} onChange={e => setQuorum(e.target.value)} style={{width:'100%'}} />
         </label>
         <label>Acceptance Threshold (%)<br />
           <input type="number" placeholder="Percentage of 'Yes' votes required to pass" value={acceptanceThreshold} onChange={e => setAcceptanceThreshold(e.target.value)} />
         </label><br />
-        <h4>Ballot Measures</h4>
+          <h4>Ballot Measures <span style={{color:'red'}}>*</span></h4>
         {measures.map((m, idx) => (
           <div key={idx} style={{marginBottom: '10px'}}>
             <label>Measure Title<br />
-              <input value={m.title} onChange={e => handleMeasureChange(idx, { ...m, title: e.target.value })} placeholder={`Measure ${idx+1} title`} />
+                <input required value={m.title} onChange={e => handleMeasureChange(idx, { ...m, title: e.target.value })} placeholder={`Measure ${idx+1} title`} />
             </label><br />
             <label>Measure Description<br />
               <textarea value={m.description} onChange={e => handleMeasureChange(idx, { ...m, description: e.target.value })} placeholder={`Describe measure ${idx+1}`} />
@@ -100,6 +100,7 @@ export default function CreateBallotPage({ branding }) {
   <button type="button" onClick={addMeasure} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add Measure</button>
         <br /><br />
   <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Create Ballot</button>
+          <div style={{marginTop:'8px', color:'red', fontSize:'0.95em'}}>* Required fields: Title, Start Time, End Time, at least one Measure with a title</div>
       </form>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}

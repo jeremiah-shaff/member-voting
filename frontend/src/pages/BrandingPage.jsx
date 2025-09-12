@@ -63,7 +63,7 @@ export default function BrandingPage() {
   return (
     <div>
       <h2>Branding Settings</h2>
-      <form onSubmit={handleUpdate} style={{marginBottom:'2em'}}>
+  <form onSubmit={handleUpdate} style={{marginBottom:'2em'}}>
   <label>Background Color <input type="color" value={form.bg_color} onChange={e => setForm(f => ({ ...f, bg_color: e.target.value }))} /></label><br />
   <label>Navigation Bar Color <input type="color" value={form.nav_color} onChange={e => setForm(f => ({ ...f, nav_color: e.target.value }))} /></label><br />
   <label>Navigation Bar Text Color <input type="color" value={form.nav_text_color} onChange={e => setForm(f => ({ ...f, nav_text_color: e.target.value }))} /></label><br />
@@ -113,7 +113,35 @@ export default function BrandingPage() {
         setError('Network error: ' + err.toString());
       }
     }}
-  >Request Certificate</button><br />
+  >Request Certificate</button>
+  <button
+    type="button"
+    style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft: '8px'}}
+    onClick={async () => {
+      setError(''); setSuccess('');
+      if (!form.fqdn) { setError('FQDN required'); return; }
+      setSuccess('Rebuilding nginx config for HTTPS...');
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch('/api/rebuild-nginx-config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ fqdn: form.fqdn })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSuccess(data.message || 'Nginx config rebuilt for HTTPS!');
+        } else {
+          setError(data.error ? `${data.error}${data.details ? ' - ' + data.details : ''}` : 'Nginx config rebuild failed');
+        }
+      } catch (err) {
+        setError('Network error: ' + err.toString());
+      }
+    }}
+  >Rebuild HTTPS Config</button><br />
   <button type="submit" style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop: '8px'}}>Update Branding</button>
       </form>
       <div style={{marginBottom:'2em'}}>

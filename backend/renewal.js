@@ -5,8 +5,7 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-
-const CERT_DIR = path.join(__dirname, 'certs');
+const CERT_DIR = process.env.CERT_DIR || path.join(__dirname, 'certs');
 const certPath = path.join(CERT_DIR, 'cert.pem');
 
 function getCertExpiry() {
@@ -19,6 +18,10 @@ function getCertExpiry() {
 }
 
 async function renewIfNeeded() {
+  if (!fs.existsSync(certPath)) {
+    console.log('No certificate file found at', certPath, '- skipping renewal.');
+    return;
+  }
   const expiry = getCertExpiry();
   const fqdn = await getFqdnFromDb();
   if (!expiry || (expiry - Date.now()) < 1000 * 60 * 60 * 24 * 14) { // <14 days
@@ -37,4 +40,4 @@ schedule.schedule('0 2 * * *', async () => {
 });
 
 // Run once on startup
-// renewIfNeeded();
+renewIfNeeded();
