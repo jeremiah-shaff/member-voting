@@ -39,19 +39,33 @@ export default function AdminDashboard({ branding }) {
       <h2>Admin Dashboard</h2>
       {error && <div style={{color:'red'}}>{error}</div>}
       <ul>
-        {ballots.map(b => (
-          <li key={b.id}>
-            {b.title}
-            <span style={{marginLeft:'12px', fontStyle:'italic', color:'#666'}}>
-              {Array.isArray(b.committee_names) && b.committee_names.filter(n => n).length > 0
-                ? `Assigned to: ${b.committee_names.filter(n => n).join(', ')}`
-                : 'Open to all members'}
-            </span>
-            <button onClick={() => fetchReport(b.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}} >View Report</button>
-            <a href={`/admin/edit-ballot/${b.id}`}><button style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Edit</button></a>
-            <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
-          </li>
-        ))}
+        {ballots.map(b => {
+          // Ballot committee membership check for admin
+          let adminIsCommitteeMember = true;
+          if (Array.isArray(b.committee_ids) && b.committee_ids.length > 0) {
+            const adminCommittees = (localStorage.getItem('committee_ids') || '').split(',').map(Number);
+            adminIsCommitteeMember = b.committee_ids.some(cid => adminCommittees.includes(cid));
+          }
+          return (
+            <li key={b.id}>
+              {b.title}
+              <span style={{marginLeft:'12px', fontStyle:'italic', color:'#666'}}>
+                {Array.isArray(b.committee_names) && b.committee_names.filter(n => n).length > 0
+                  ? `Assigned to: ${b.committee_names.filter(n => n).join(', ')}`
+                  : 'Open to all members'}
+              </span>
+              <button onClick={() => fetchReport(b.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}} >View Report</button>
+              <a href={`/admin/edit-ballot/${b.id}`}>
+                <button
+                  style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}
+                  disabled={!adminIsCommitteeMember}
+                  title={!adminIsCommitteeMember ? 'You are not a member of the relevant committee' : ''}
+                >Edit</button>
+              </a>
+              <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
+            </li>
+          );
+        })}
       </ul>
       {report && (
         <div style={{marginTop: '2em'}}>

@@ -7,9 +7,15 @@ export default function EditBallotPage({ branding }) {
   const navigate = useNavigate();
   const [ballot, setBallot] = useState(null);
   const [measures, setMeasures] = useState([]);
+  const [committees, setCommittees] = useState([]);
+  const [selectedCommittee, setSelectedCommittee] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    apiRequest('/committees', 'GET', null, token).then(setCommittees);
+  }, []);
   useEffect(() => {
     const token = localStorage.getItem('token');
     apiRequest(`/ballots/${id}`, 'GET', null, token).then(res => {
@@ -23,6 +29,12 @@ export default function EditBallotPage({ branding }) {
           })));
         } else {
           setMeasures([]);
+        }
+        // Set selected committee if assigned
+        if (Array.isArray(res.committee_ids) && res.committee_ids.length > 0) {
+          setSelectedCommittee(res.committee_ids[0]);
+        } else {
+          setSelectedCommittee('');
         }
       } else setError(res.error || 'Failed to load ballot');
     });
@@ -50,7 +62,8 @@ export default function EditBallotPage({ branding }) {
       end_time: ballot.end_time,
       quorum: Number(ballot.quorum),
       acceptance_threshold: Number(ballot.acceptance_threshold),
-      measures: measures.filter(m => m.title && m.title.trim()).map(m => `${m.title}||${m.description || ''}`)
+      measures: measures.filter(m => m.title && m.title.trim()).map(m => `${m.title}||${m.description || ''}`),
+      committee_ids: selectedCommittee ? [selectedCommittee] : []
     }, token);
     if (res.id) {
       setSuccess('Ballot updated!');
@@ -67,40 +80,48 @@ export default function EditBallotPage({ branding }) {
   return (
     <div>
       <h2>Edit Ballot</h2>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'16px', maxWidth:'500px', margin:'0 auto'}}>
+        <label>Assign to Committee (optional)<br />
+          <select value={selectedCommittee} onChange={e => setSelectedCommittee(e.target.value)} style={{width:'100%'}}>
+            <option value="">Open to all members</option>
+            {committees.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </label>
         <label>Ballot Title<br />
-          <input name="title" placeholder="Title of the ballot (e.g. Board Elections)" value={ballot.title} onChange={handleChange} />
-        </label><br />
+          <input name="title" placeholder="Title of the ballot (e.g. Board Elections)" value={ballot.title} onChange={handleChange} style={{width:'100%'}} />
+        </label>
         <label>Ballot Description<br />
-          <textarea name="description" placeholder="Describe the purpose or context of this ballot" value={ballot.description} onChange={handleChange} />
-        </label><br />
+          <textarea name="description" placeholder="Describe the purpose or context of this ballot" value={ballot.description} onChange={handleChange} style={{width:'100%'}} />
+        </label>
         <label>Voting Start Time<br />
-          <input name="start_time" type="datetime-local" value={ballot.start_time?.slice(0,16)} onChange={handleChange} />
-        </label><br />
+          <input name="start_time" type="datetime-local" value={ballot.start_time?.slice(0,16)} onChange={handleChange} style={{width:'100%'}} />
+        </label>
         <label>Voting End Time<br />
-          <input name="end_time" type="datetime-local" value={ballot.end_time?.slice(0,16)} onChange={handleChange} />
-        </label><br />
+          <input name="end_time" type="datetime-local" value={ballot.end_time?.slice(0,16)} onChange={handleChange} style={{width:'100%'}} />
+        </label>
         <label>Quorum<br />
-          <input name="quorum" type="number" placeholder="Minimum number of votes required" value={ballot.quorum} onChange={handleChange} />
-        </label><br />
+          <input name="quorum" type="number" placeholder="Minimum number of votes required" value={ballot.quorum} onChange={handleChange} style={{width:'100%'}} />
+        </label>
         <label>Acceptance Threshold (%)<br />
-          <input name="acceptance_threshold" type="number" placeholder="Percentage of 'Yes' votes required to pass" value={ballot.acceptance_threshold} onChange={handleChange} />
-        </label><br />
+          <input name="acceptance_threshold" type="number" placeholder="Percentage of 'Yes' votes required to pass" value={ballot.acceptance_threshold} onChange={handleChange} style={{width:'100%'}} />
+        </label>
         <h4>Ballot Measures</h4>
         {measures.map((m, idx) => (
           <div key={idx} style={{marginBottom: '10px'}}>
             <label>Measure Title<br />
-              <input value={m.title} onChange={e => handleMeasureChange(idx, { ...m, title: e.target.value })} placeholder={`Measure ${idx+1} title`} />
+              <input value={m.title} onChange={e => handleMeasureChange(idx, { ...m, title: e.target.value })} placeholder={`Measure ${idx+1} title`} style={{width:'100%'}} />
             </label><br />
             <label>Measure Description<br />
-              <textarea value={m.description} onChange={e => handleMeasureChange(idx, { ...m, description: e.target.value })} placeholder={`Describe measure ${idx+1}`} />
+              <textarea value={m.description} onChange={e => handleMeasureChange(idx, { ...m, description: e.target.value })} placeholder={`Describe measure ${idx+1}`} style={{width:'100%'}} />
             </label><br />
             <button type="button" onClick={() => removeMeasure(idx)} disabled={measures.length === 1} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Remove</button>
           </div>
         ))}
-  <button type="button" onClick={addMeasure} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add Measure</button>
-        <br />
-  <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Update Ballot</button>
+        <button type="button" onClick={addMeasure} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add Measure</button>
+        <br /><br />
+        <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Update Ballot</button>
       </form>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}
