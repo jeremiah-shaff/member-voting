@@ -5,7 +5,16 @@ const acme = require('acme-client');
 require('dotenv').config();
 
 const CERT_DIR = path.join(__dirname, 'certs');
-if (!fs.existsSync(CERT_DIR)) fs.mkdirSync(CERT_DIR);
+function ensureCertDir() {
+  try {
+    fs.mkdirSync(CERT_DIR, { recursive: true });
+  } catch (err) {
+    if (err.code !== 'EEXIST') {
+      console.error(`[ACME] Failed to create certs directory: ${CERT_DIR}`);
+      throw err;
+    }
+  }
+}
 
 global.__acmeChallengeMap = global.__acmeChallengeMap || {};
 
@@ -15,8 +24,8 @@ async function getCertificate(fqdn) {
     directoryUrl: acme.directory.letsencrypt.production,
     accountKey
   });
-  if (!fs.existsSync(CERT_DIR)) fs.mkdirSync(CERT_DIR);
-  
+  ensureCertDir();
+
   const [key, csr] = await acme.crypto.createCsr({ commonName: fqdn });
 
   const cert = await client.auto({
@@ -35,8 +44,13 @@ async function getCertificate(fqdn) {
     }
   });
 
-  fs.writeFileSync(path.join(CERT_DIR, 'privkey.pem'), key);
-  fs.writeFileSync(path.join(CERT_DIR, 'cert.pem'), cert);
+  try {
+    fs.writeFileSync(path.join(CERT_DIR, 'privkey.pem'), key);
+    fs.writeFileSync(path.join(CERT_DIR, 'cert.pem'), cert);
+  } catch (err) {
+    console.error(`[ACME] Failed to write certificate files to ${CERT_DIR}`);
+    throw err;
+  }
   return { key, cert };
 }
 
