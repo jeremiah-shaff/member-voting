@@ -45,11 +45,11 @@ export default function NavBar({ branding }) {
     links.push(<Link key="ballots" to="/ballots" style={linkStyle}>Ballots</Link>);
   }
   if (isAdmin) {
-    links.push(<Link key="admin" to="/admin" style={linkStyle}>Admin Dashboard</Link>);
+    links.push(<Link key="admin" to="/admin" style={linkStyle}>Reporting</Link>);
     links.push(<Link key="create-ballot" to="/admin/create-ballot" style={linkStyle}>Create Ballot</Link>);
     links.push(<Link key="members" to="/admin/members" style={linkStyle}>Member Management</Link>);
-    links.push(<Link key="branding" to="/admin/branding" style={linkStyle}>Branding</Link>);
     links.push(<Link key="committees" to="/admin/committees" style={linkStyle}>Committees</Link>);
+    links.push(<Link key="branding" to="/admin/branding" style={linkStyle}>Branding</Link>);
   }
   if (token) {
     links.push(<button key="logout" style={buttonStyle} onClick={() => {
