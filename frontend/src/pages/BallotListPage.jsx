@@ -46,7 +46,7 @@ export default function BallotListPage({ branding }) {
                   : 'Open to all members'}
               </span>
               {/* Show voted status for members */}
-              {!isAdmin && b.has_voted && (
+              {b.has_voted && (
                 <span style={{marginLeft:'12px', color:'green', fontWeight:'bold'}}>Voted</span>
               )}
               {/* Show expired status for admins */}

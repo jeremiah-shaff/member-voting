@@ -312,13 +312,24 @@ router.get('/ballots', authenticateToken, async (req, res) => {
     const commRes = await pool.query('SELECT committee_id FROM member_committees WHERE member_id = $1', [req.user.id]);
     const committeeIds = commRes.rows.map(r => r.committee_id);
     // Filter ballots: assigned to member's committees or open to all
-    const visibleBallots = ballotsWithCommittees.rows.filter(b => {
-      // committee_ids may contain nulls if ballot is open to all
+    let visibleBallots = ballotsWithCommittees.rows.filter(b => {
       const assignedCommitteeIds = Array.isArray(b.committee_ids) ? b.committee_ids.filter(id => id !== null) : [];
       if (assignedCommitteeIds.length === 0) return true; // open to all
-      // If any assigned committee is in member's committees
       return assignedCommitteeIds.some(id => committeeIds.includes(id));
     });
+    // For each visible ballot, check if user has voted
+    const ballotIds = visibleBallots.map(b => b.id);
+    let votedMap = {};
+    if (ballotIds.length > 0) {
+      const votedRes = await pool.query(
+        'SELECT ballot_id, COUNT(*) as count FROM votes WHERE member_id = $1 AND ballot_id = ANY($2::int[]) GROUP BY ballot_id',
+        [req.user.id, ballotIds]
+      );
+      votedRes.rows.forEach(row => {
+        votedMap[row.ballot_id] = Number(row.count) > 0;
+      });
+    }
+    visibleBallots = visibleBallots.map(b => ({ ...b, has_voted: !!votedMap[b.id] }));
     res.json(visibleBallots);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list ballots' });
