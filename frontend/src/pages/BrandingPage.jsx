@@ -76,6 +76,22 @@ export default function BrandingPage() {
     onClick={async () => {
       setError(''); setSuccess('');
       if (!form.fqdn) { setError('FQDN required'); return; }
+      setSuccess('Checking certificate status...');
+      try {
+        const certRes = await fetch('/api/certificate-status');
+        const certData = await certRes.json();
+        if (certData.valid && certData.expires) {
+          const expDate = new Date(certData.expires);
+          const now = new Date();
+          const daysLeft = Math.round((expDate - now) / (1000 * 60 * 60 * 24));
+          if (daysLeft > 7) {
+            setSuccess(`Certificate is still valid (expires in ${daysLeft} days, on ${expDate.toLocaleString()}). No need to request a new one.`);
+            return;
+          }
+        }
+      } catch (err) {
+        // Ignore error, allow request to proceed
+      }
       setSuccess('Requesting certificate...');
       const token = localStorage.getItem('token');
       try {

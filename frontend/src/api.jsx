@@ -10,5 +10,11 @@ export async function apiRequest(path, method = 'GET', body, token) {
     },
     body: body ? JSON.stringify(body) : undefined
   });
+  if (res.status === 401 || res.status === 403) {
+    // Token expired or invalid, redirect to login
+    localStorage.removeItem('token');
+    window.location.href = '/';
+    return { error: 'Authentication required' };
+  }
   return res.json();
 }

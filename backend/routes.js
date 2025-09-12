@@ -1,3 +1,9 @@
+// Endpoint to check certificate expiration
+
+const CERT_DIR = path.join(__dirname, 'certs');
+const CERT_FILE = path.join(CERT_DIR, 'cert.pem');
+const { X509Certificate } = require('crypto');
+
 const { exec } = require('child_process');
 const express = require('express');
 const fs = require('fs');
@@ -25,6 +31,22 @@ router.get('/.well-known/acme-challenge/:token', (req, res) => {
   }
 });
 
+router.get('/certificate-status', (req, res) => {
+  try {
+    if (!fs.existsSync(CERT_FILE)) {
+      return res.json({ valid: false, expires: null });
+    }
+    const certData = fs.readFileSync(CERT_FILE);
+    const cert = new X509Certificate(certData);
+    const expires = cert.validTo;
+    const now = new Date();
+    const expDate = new Date(expires);
+    const valid = expDate > now;
+    res.json({ valid, expires });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to check certificate status' });
+  }
+});
 // Request logging middleware
 router.use((req, res, next) => {
   const logEntry = `${new Date().toISOString()} ${req.method} ${req.originalUrl} IP:${req.ip}\n`;

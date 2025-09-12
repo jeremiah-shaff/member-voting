@@ -53,9 +53,6 @@ const certPath = CERT_DIR + '/cert.pem';
 if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
   const key = fs.readFileSync(keyPath);
   const cert = fs.readFileSync(certPath);
-  https.createServer({ key, cert }, app).listen(443, () => {
-    console.log('HTTPS server running on port 443');
-  });
 }
 app.listen(PORT, () => {
   console.log(`HTTP server running on port ${PORT}`);
