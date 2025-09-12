@@ -128,8 +128,10 @@ NGINX
 
 sudo ln -sf /etc/nginx/sites-available/member-voting /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo mkdir $CERT_DIR
-sudo chown -R $USER:$USER $CERT_DIR
+if [ ! -d "$CERT_DIR" ]; then
+  sudo mkdir "$CERT_DIR"
+fi
+sudo chown -R $USER:$USER "$CERT_DIR"
 
 # Optional: Setup HTTPS with Certbot
 # sudo certbot --nginx -d your.domain.com --non-interactive --agree-tos -m admin@your.domain.com

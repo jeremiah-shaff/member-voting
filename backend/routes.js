@@ -172,32 +172,15 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
   const certDir = process.env.CERT_DIR || path.join(appDir, 'backend/certs');
   const privkeyPath = path.join(certDir, 'privkey.pem');
   const certPath = path.join(certDir, 'cert.pem');
-    let conf = '';
+    // Build nginx config from scratch
+    const httpBlock = `server {\n    listen 80;\n    server_name ${fqdn};\n    location /.well-known/acme-challenge/ {\n        proxy_pass http://localhost:4000/api/.well-known/acme-challenge/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location / {\n        return 301 https://$host$request_uri;\n    }\n}`;
+    const frontendDist = path.join(appDir, 'frontend/dist');
+    const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root ${frontendDist};\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
+    // Overwrite config file with new blocks
+    const newConf = httpBlock + '\n\n' + httpsBlock + '\n';
     try {
-      conf = fs.readFileSync(nginxConfPath, 'utf8');
-    } catch (err) {
-      console.error(`[NGINX] Failed to read config: ${nginxConfPath}`);
-      throw err;
-    }
-
-  // Port 80 block: only allow ACME challenge, redirect all else to HTTPS
-  const httpBlock = `server {\n    listen 80;\n    server_name ${fqdn};\n    location /.well-known/acme-challenge/ {\n        proxy_pass http://localhost:4000/api/.well-known/acme-challenge/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location / {\n        return 301 https://$host$request_uri;\n    }\n}`;
-
-  // HTTPS block as before
-  const frontendDist = path.join(appDir, 'frontend/dist');
-  const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root ${frontendDist};\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
-
-  // Remove any existing port 80 block
-  conf = conf.replace(/server\s*\{[^}]*listen 80;[^}]*\}/gs, '');
-  // Remove any existing HTTPS block
-  conf = conf.replace(/server\s*\{[^}]*listen 443 ssl;[^}]*\}/gs, '');
-
-  // Append new blocks
-  conf += '\n\n' + httpBlock + '\n\n' + httpsBlock + '\n';
-
-    try {
-      fs.writeFileSync(nginxConfPath, conf, 'utf8');
-      console.log('[NGINX] Config updated with new certificate paths.');
+      fs.writeFileSync(nginxConfPath, newConf, 'utf8');
+      console.log('[NGINX] Config rebuilt from scratch.');
     } catch (err) {
       console.error(`[NGINX] Failed to write config: ${nginxConfPath}`);
       throw err;
@@ -249,15 +232,11 @@ router.post('/rebuild-nginx-config', authenticateToken, requireAdmin, async (req
     // HTTPS block
   const frontendDist = path.join(appDir, 'frontend/dist');
   const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root ${frontendDist};\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
-    // Remove any existing port 80 block
-    conf = conf.replace(/server\s*\{[^}]*listen 80;[^}]*\}/gs, '');
-    // Remove any existing HTTPS block
-    conf = conf.replace(/server\s*\{[^}]*listen 443 ssl;[^}]*\}/gs, '');
-    // Append new blocks
-    conf += '\n\n' + httpBlock + '\n\n' + httpsBlock + '\n';
+    // Build nginx config from scratch
+    const newConf = httpBlock + '\n\n' + httpsBlock + '\n';
     try {
-      fs.writeFileSync(nginxConfPath, conf, 'utf8');
-      console.log('[NGINX] Config updated with existing certificate paths.');
+      fs.writeFileSync(nginxConfPath, newConf, 'utf8');
+      console.log('[NGINX] Config rebuilt from scratch.');
     } catch (err) {
       console.error(`[NGINX] Failed to write config: ${nginxConfPath}`);
       throw err;
