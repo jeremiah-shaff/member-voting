@@ -10,11 +10,15 @@ export async function apiRequest(path, method = 'GET', body, token) {
     },
     body: body ? JSON.stringify(body) : undefined
   });
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
     // Token expired or invalid, redirect to login
     localStorage.removeItem('token');
     window.location.href = '/';
     return { error: 'Authentication required' };
+  }
+  if (res.status === 403) {
+    // Forbidden, just return error for UI
+    return { error: 'You are not authorized to perform this action.' };
   }
   return res.json();
 }
