@@ -509,7 +509,6 @@ router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, r
 });
 
 // Admin: request ACME certificate for FQDN
-const { exec } = require('child_process');
 router.post('/request-certificate', authenticateToken, requireAdmin, async (req, res) => {
   const fqdn = req.body.fqdn;
   if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
