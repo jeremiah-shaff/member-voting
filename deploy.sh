@@ -98,13 +98,11 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    # Proxy ACME challenge
+    # Serve ACME challenge files directly for Let's Encrypt
     location /.well-known/acme-challenge/ {
-        proxy_pass http://localhost:4000/api/.well-known/acme-challenge/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        alias $APP_DIR/frontend/public/.well-known/acme-challenge/;
+        try_files \$uri =404;
+        default_type text/plain;
     }
 
     # Proxy API
