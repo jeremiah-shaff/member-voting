@@ -1,3 +1,23 @@
+-- Committees table
+CREATE TABLE committees (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT
+);
+
+-- Member-Committee assignments
+CREATE TABLE member_committees (
+    member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+    committee_id INTEGER REFERENCES committees(id) ON DELETE CASCADE,
+    PRIMARY KEY (member_id, committee_id)
+);
+
+-- Ballot-Committee assignments (restrict ballot to committee)
+CREATE TABLE ballot_committees (
+    ballot_id INTEGER REFERENCES ballots(id) ON DELETE CASCADE,
+    committee_id INTEGER REFERENCES committees(id) ON DELETE CASCADE,
+    PRIMARY KEY (ballot_id, committee_id)
+);
 -- Members table
 CREATE TABLE members (
     id SERIAL PRIMARY KEY,

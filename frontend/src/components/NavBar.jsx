@@ -36,27 +36,33 @@ export default function NavBar({ branding }) {
     cursor: 'pointer'
   };
 
+  const links = [];
+  if (!token) {
+    links.push(<Link key="login" to="/" style={linkStyle}>Login</Link>);
+    links.push(<Link key="register" to="/register" style={linkStyle}>Register</Link>);
+  }
+  if (token) {
+    links.push(<Link key="ballots" to="/ballots" style={linkStyle}>Ballots</Link>);
+  }
+  if (isAdmin) {
+    links.push(<Link key="admin" to="/admin" style={linkStyle}>Admin Dashboard</Link>);
+    links.push(<Link key="create-ballot" to="/admin/create-ballot" style={linkStyle}>Create Ballot</Link>);
+    links.push(<Link key="members" to="/admin/members" style={linkStyle}>Member Management</Link>);
+    links.push(<Link key="branding" to="/admin/branding" style={linkStyle}>Branding</Link>);
+    links.push(<Link key="committees" to="/admin/committees" style={linkStyle}>Committees</Link>);
+  }
+  if (token) {
+    links.push(<button key="logout" style={buttonStyle} onClick={() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('is_admin');
+      window.location.href = '/';
+    }}>Logout</button>);
+  }
   return (
     <nav style={navStyle}>
-      {!token && <><Link to="/" style={linkStyle}>Login</Link> |{' '}<Link to="/register" style={linkStyle}>Register</Link> |{' '}</>}
-      {token && <Link to="/ballots" style={linkStyle}>Ballots</Link>}
-      {isAdmin && (
-        <>
-          {' '}| <Link to="/admin" style={linkStyle}>Admin Dashboard</Link>
-          {' '}| <Link to="/admin/create-ballot" style={linkStyle}>Create Ballot</Link>
-          {' '}| <Link to="/admin/members" style={linkStyle}>Member Management</Link>
-          {' '}| <Link to="/admin/branding" style={linkStyle}>Branding</Link>
-        </>
-      )}
-      {token && (
-        <>
-          {' '}| <button style={buttonStyle} onClick={() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('is_admin');
-            window.location.href = '/';
-          }}>Logout</button>
-        </>
-      )}
+      {links.map((link, idx) => (
+        <span key={idx} style={{marginRight: idx < links.length - 1 ? '16px' : '0'}}>{link}</span>
+      ))}
     </nav>
   );
 }

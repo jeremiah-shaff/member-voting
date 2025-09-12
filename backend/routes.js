@@ -1,6 +1,6 @@
 // Endpoint to check certificate expiration
 
-
+const path = require('path');
 const { exec } = require('child_process');
 const express = require('express');
 const fs = require('fs');
@@ -14,7 +14,6 @@ const { X509Certificate } = require('crypto');
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
@@ -124,6 +123,60 @@ router.post('/branding/icon', authenticateToken, requireAdmin, upload.single('ic
   }
 });
 
+// Admin: request ACME certificate for FQDN
+router.post('/request-certificate', authenticateToken, requireAdmin, async (req, res) => {
+  const fqdn = req.body.fqdn;
+  if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
+  try {
+    await getCertificate(fqdn);
+
+    // Update nginx config with new cert paths and add HTTPS block if missing
+    const nginxConfPath = '/etc/nginx/sites-available/member-voting';
+    const privkeyPath = '/opt/member-voting/backend/certs/privkey.pem';
+    const certPath = '/opt/member-voting/backend/certs/cert.pem';
+    let conf = '';
+    try {
+      conf = fs.readFileSync(nginxConfPath, 'utf8');
+    } catch (err) {
+      console.error(`[NGINX] Failed to read config: ${nginxConfPath}`);
+      throw err;
+    }
+
+  // Port 80 block: only allow ACME challenge, redirect all else to HTTPS
+  const httpBlock = `server {\n    listen 80;\n    server_name ${fqdn};\n    location /.well-known/acme-challenge/ {\n        proxy_pass http://localhost:4000/api/.well-known/acme-challenge/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location / {\n        return 301 https://$host$request_uri;\n    }\n}`;
+
+  // HTTPS block as before
+  const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root /opt/member-voting/frontend/dist;\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
+
+  // Remove any existing port 80 block
+  conf = conf.replace(/server\s*\{[^}]*listen 80;[^}]*\}/gs, '');
+  // Remove any existing HTTPS block
+  conf = conf.replace(/server\s*\{[^}]*listen 443 ssl;[^}]*\}/gs, '');
+
+  // Append new blocks
+  conf += '\n\n' + httpBlock + '\n\n' + httpsBlock + '\n';
+
+    try {
+      fs.writeFileSync(nginxConfPath, conf, 'utf8');
+      console.log('[NGINX] Config updated with new certificate paths.');
+    } catch (err) {
+      console.error(`[NGINX] Failed to write config: ${nginxConfPath}`);
+      throw err;
+    }
+
+    exec('sudo nginx -t && sudo systemctl reload nginx', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[NGINX] Reload failed: ${stderr}`);
+      } else {
+        console.log('[NGINX] Reloaded successfully');
+      }
+    });
+    res.json({ success: true, message: `Certificate successfully obtained for ${fqdn}` });
+    setTimeout(() => process.exit(0), 1000); // Give response time to flush
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Certificate request failed' });
+  }
+});
 
 // Register member or admin
 router.post('/auth/register', async (req, res) => {
@@ -203,24 +256,41 @@ router.post('/ballots', authenticateToken, requireAdmin, async (req, res) => {
 router.get('/ballots', authenticateToken, async (req, res) => {
   try {
     const pool = req.pool;
-    const result = await pool.query(
-      `SELECT b.id, b.title, b.description, b.start_time, b.end_time, b.quorum, b.acceptance_threshold, b.created_by, b.created_at,
-        json_agg(m.measure_text) AS measures
-        FROM ballots b
-        LEFT JOIN ballot_measures m ON b.id = m.ballot_id
-        GROUP BY b.id`
-    );
-    res.json(result.rows);
+    // Get member's committees
+    const commRes = await pool.query('SELECT committee_id FROM member_committees WHERE member_id = $1', [req.user.id]);
+    const committeeIds = commRes.rows.map(r => r.committee_id);
+    // Get ballots for those committees
+    let ballotsRes;
+    if (committeeIds.length > 0) {
+      ballotsRes = await pool.query(
+        `SELECT b.* FROM ballots b
+         JOIN ballot_committees bc ON b.id = bc.ballot_id
+         WHERE bc.committee_id = ANY($1::int[])`,
+        [committeeIds]
+      );
+    } else {
+      ballotsRes = { rows: [] };
+    }
+    res.json(ballotsRes.rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list ballots' });
   }
 });
 
-// Get ballot details (all users)
+// Get ballot details (only if member is in committee)
 router.get('/ballots/:id', authenticateToken, async (req, res) => {
   const ballotId = req.params.id;
   try {
     const pool = req.pool;
+    // Check if ballot is restricted to a committee
+    const commRes = await pool.query('SELECT committee_id FROM ballot_committees WHERE ballot_id = $1', [ballotId]);
+    if (commRes.rows.length > 0) {
+      // Get member's committees
+      const memberComms = await pool.query('SELECT committee_id FROM member_committees WHERE member_id = $1', [req.user.id]);
+      const memberCommitteeIds = memberComms.rows.map(r => r.committee_id);
+      const allowed = commRes.rows.some(r => memberCommitteeIds.includes(r.committee_id));
+      if (!allowed) return res.status(403).json({ error: 'Not authorized for this ballot' });
+    }
     const ballotResult = await pool.query(
       'SELECT id, title, description, start_time, end_time, quorum, acceptance_threshold, created_by, created_at FROM ballots WHERE id = $1',
       [ballotId]
@@ -442,7 +512,69 @@ router.delete('/members/:id', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
-// Reporting routes
+// Committee routes
+
+// Admin: create committee
+router.post('/committees', authenticateToken, requireAdmin, async (req, res) => {
+  const { name, description } = req.body;
+  if (!name) return res.status(400).json({ error: 'Committee name required' });
+  try {
+    const pool = req.pool;
+    const result = await pool.query(
+      'INSERT INTO committees (name, description) VALUES ($1, $2) RETURNING *',
+      [name, description || '']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create committee' });
+  }
+});
+
+// Admin: assign member to committee
+router.post('/committees/:id/members', authenticateToken, requireAdmin, async (req, res) => {
+  const committeeId = req.params.id;
+  const { member_id } = req.body;
+  if (!member_id) return res.status(400).json({ error: 'Member ID required' });
+  try {
+    const pool = req.pool;
+    await pool.query(
+      'INSERT INTO member_committees (member_id, committee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [member_id, committeeId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to assign member to committee' });
+  }
+});
+
+// Admin: restrict ballot to committee
+router.post('/ballots/:id/committees', authenticateToken, requireAdmin, async (req, res) => {
+  const ballotId = req.params.id;
+  const { committee_id } = req.body;
+  if (!committee_id) return res.status(400).json({ error: 'Committee ID required' });
+  try {
+    const pool = req.pool;
+    await pool.query(
+      'INSERT INTO ballot_committees (ballot_id, committee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [ballotId, committee_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to restrict ballot to committee' });
+  }
+});
+
+// List committees (all users)
+router.get('/committees', authenticateToken, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const result = await pool.query('SELECT * FROM committees');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list committees' });
+  }
+});
+
 // Admin: record paper ballot lump sum for a measure
 router.post('/ballots/:id/paper-votes', authenticateToken, requireAdmin, async (req, res) => {
   const ballotId = req.params.id;
@@ -527,57 +659,6 @@ router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, r
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: 'Failed to generate report' });
-  }
-});
-
-// Admin: request ACME certificate for FQDN
-router.post('/request-certificate', authenticateToken, requireAdmin, async (req, res) => {
-  const fqdn = req.body.fqdn;
-  if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
-  try {
-    await getCertificate(fqdn);
-
-    // Update nginx config with new cert paths and add HTTPS block if missing
-    const nginxConfPath = '/etc/nginx/sites-available/member-voting';
-    const privkeyPath = '/opt/member-voting/backend/certs/privkey.pem';
-    const certPath = '/opt/member-voting/backend/certs/cert.pem';
-    let conf = '';
-    try {
-      conf = fs.readFileSync(nginxConfPath, 'utf8');
-    } catch (err) {
-      console.error(`[NGINX] Failed to read config: ${nginxConfPath}`);
-      throw err;
-    }
-
-    // Add or update HTTPS server block
-    const httpsBlock = `server {\n    listen 443 ssl;\n    server_name ${fqdn};\n    ssl_certificate ${certPath};\n    ssl_certificate_key ${privkeyPath};\n    location / {\n        root /opt/member-voting/frontend/dist;\n        try_files $uri $uri/ /index.html;\n    }\n    location /api/ {\n        proxy_pass http://localhost:4000/api/;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n    location /uploads/ {\n        proxy_pass http://localhost:4000/uploads/;\n    }\n}`;
-
-    if (!conf.includes('listen 443 ssl;')) {
-      conf += '\n\n' + httpsBlock + '\n';
-    } else {
-      conf = conf.replace(/ssl_certificate\s+[^;]+;/g, `ssl_certificate ${certPath};`);
-      conf = conf.replace(/ssl_certificate_key\s+[^;]+;/g, `ssl_certificate_key ${privkeyPath};`);
-    }
-
-    try {
-      fs.writeFileSync(nginxConfPath, conf, 'utf8');
-      console.log('[NGINX] Config updated with new certificate paths.');
-    } catch (err) {
-      console.error(`[NGINX] Failed to write config: ${nginxConfPath}`);
-      throw err;
-    }
-
-    exec('sudo nginx -t && sudo systemctl reload nginx', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`[NGINX] Reload failed: ${stderr}`);
-      } else {
-        console.log('[NGINX] Reloaded successfully');
-      }
-    });
-    res.json({ success: true, message: `Certificate successfully obtained for ${fqdn}` });
-    setTimeout(() => process.exit(0), 1000); // Give response time to flush
-  } catch (err) {
-    res.status(500).json({ error: err.message || 'Certificate request failed' });
   }
 });
 
