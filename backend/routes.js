@@ -1,14 +1,14 @@
 // Endpoint to check certificate expiration
 
-const CERT_DIR = path.join(__dirname, 'certs');
-const CERT_FILE = path.join(CERT_DIR, 'cert.pem');
-const { X509Certificate } = require('crypto');
 
 const { exec } = require('child_process');
 const express = require('express');
 const fs = require('fs');
 const LOG_PATH = process.env.REQUEST_LOG_PATH || './request.log';
 const router = express.Router();
+const CERT_DIR = path.join(__dirname, 'certs');
+const CERT_FILE = path.join(CERT_DIR, 'cert.pem');
+const { X509Certificate } = require('crypto');
 
 // Auth routes
 
