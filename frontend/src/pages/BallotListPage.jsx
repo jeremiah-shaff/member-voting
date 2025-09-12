@@ -21,6 +21,11 @@ export default function BallotListPage({ branding }) {
         {ballots.map(b => (
           <li key={b.id}>
             <a href={`/ballots/${b.id}`}>{b.title}</a>
+            <span style={{marginLeft:'12px', fontStyle:'italic', color:'#666'}}>
+              {b.committee_names && b.committee_names.filter(n => n).length > 0
+                ? `Assigned to: ${b.committee_names.filter(n => n).join(', ')}`
+                : 'Open to all members'}
+            </span>
           </li>
         ))}
       </ul>

@@ -9,6 +9,8 @@ export default function CommitteeManagementPage({ branding }) {
   const [committeeForm, setCommitteeForm] = useState({ name: '', description: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [editCommitteeId, setEditCommitteeId] = useState(null);
+  const [editCommitteeForm, setEditCommitteeForm] = useState({ name: '', description: '' });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -56,6 +58,40 @@ export default function CommitteeManagementPage({ branding }) {
     }
   };
 
+  const handleEditCommittee = (committee) => {
+    setEditCommitteeId(committee.id);
+    setEditCommitteeForm({ name: committee.name, description: committee.description });
+  };
+
+  const handleUpdateCommittee = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const res = await apiRequest(`/committees/${editCommitteeId}`, 'PUT', editCommitteeForm, token);
+    if (res.id) {
+      setSuccess('Committee updated!');
+      setError('');
+      setEditCommitteeId(null);
+      apiRequest('/committees', 'GET', null, token).then(setCommittees);
+    } else {
+      setError(res.error || 'Update failed');
+      setSuccess('');
+    }
+  };
+
+  const handleDeleteCommittee = async (committeeId) => {
+    if (!window.confirm('Delete this committee?')) return;
+    const token = localStorage.getItem('token');
+    const res = await apiRequest(`/committees/${committeeId}`, 'DELETE', null, token);
+    if (res.success) {
+      setSuccess('Committee deleted!');
+      setError('');
+      apiRequest('/committees', 'GET', null, token).then(setCommittees);
+    } else {
+      setError(res.error || 'Delete failed');
+      setSuccess('');
+    }
+  };
+
   return (
     <div>
       <h2>Committee Management</h2>
@@ -71,6 +107,16 @@ export default function CommitteeManagementPage({ branding }) {
         {committees.map(c => (
           <li key={c.id}>
             <strong>{c.name}</strong> - {c.description}
+            <button style={{marginLeft:'8px'}} onClick={() => handleEditCommittee(c)}>Rename</button>
+            <button style={{marginLeft:'8px', color:'red'}} onClick={() => handleDeleteCommittee(c.id)}>Delete</button>
+            {editCommitteeId === c.id && (
+              <form onSubmit={handleUpdateCommittee} style={{marginTop:'8px'}}>
+                <input value={editCommitteeForm.name} onChange={e => setEditCommitteeForm(f => ({...f, name: e.target.value}))} placeholder="New name" />
+                <input value={editCommitteeForm.description} onChange={e => setEditCommitteeForm(f => ({...f, description: e.target.value}))} placeholder="New description" />
+                <button type="submit" style={{marginLeft:'8px'}}>Save</button>
+                <button type="button" style={{marginLeft:'8px'}} onClick={() => setEditCommitteeId(null)}>Cancel</button>
+              </form>
+            )}
             <div>
               <h4>Assign Members</h4>
               <ul>
