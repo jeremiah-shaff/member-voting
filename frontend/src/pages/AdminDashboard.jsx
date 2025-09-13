@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../api.jsx';
+import { Link } from 'react-router-dom';
 
 export default function AdminDashboard({ branding }) {
   const handleDeleteBallot = async (id) => {
@@ -58,6 +59,16 @@ export default function AdminDashboard({ branding }) {
                 >Edit</button>
               </a>
               <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
+              <Link to={`/admin/ballot/${b.id}/qr`} style={{
+                background: (branding?.button_color || '#007bff'),
+                color: (branding?.text_color || '#fff'),
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 12px',
+                marginLeft: '8px',
+                textDecoration: 'none',
+                fontWeight: 'bold',
+              }}>Live</Link>
             </li>
           );
         })}
