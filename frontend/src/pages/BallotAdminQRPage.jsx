@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import QRCode from 'qrcode.react';
+import { QRCode } from 'qrcode.react';
 import { getBallot } from '../api';
 
 export default function BallotAdminQRPage({ branding }) {
