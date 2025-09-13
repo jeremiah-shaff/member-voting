@@ -52,3 +52,9 @@ export async function setRegistrationEnabled(enabled) {
   if (!res.ok) throw new Error('Failed to update registration status');
   return (await res.json()).enabled;
 }
+
+export async function getBallot(id) {
+  const res = await fetch(`/api/ballots/${id}`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to fetch ballot');
+  return await res.json();
+}
