@@ -259,8 +259,7 @@ router.post('/rebuild-nginx-config', authenticateToken, requireAdmin, async (req
 router.get('/registration-enabled', async (req, res) => {
   res.json({ enabled: await getRegistrationEnabled() });
 });
-router.post('/registration-enabled', async (req, res) => {
-  if (!req.user || !req.user.is_admin) return res.status(403).json({ error: 'Forbidden' });
+router.post('/registration-enabled', authenticateToken, requireAdmin, async (req, res) => {
   await setRegistrationEnabled(!!req.body.enabled);
   res.json({ enabled: await getRegistrationEnabled() });
 });
