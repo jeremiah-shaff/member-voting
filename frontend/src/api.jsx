@@ -39,9 +39,13 @@ export async function getRegistrationEnabled() {
   return (await res.json()).enabled;
 }
 export async function setRegistrationEnabled(enabled) {
+  const token = localStorage.getItem('token');
   const res = await fetch('/api/registration-enabled', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
     body: JSON.stringify({ enabled }),
     credentials: 'include',
   });
