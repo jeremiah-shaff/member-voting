@@ -12,12 +12,12 @@ async function getFqdnFromDb() {
 }
 
 async function getRegistrationEnabled() {
-  const row = await db.get('SELECT value FROM settings WHERE key = ?', ['registrationEnabled']);
-  return row ? row.value === 'true' : true;
+  const result = await pool.query('SELECT value FROM settings WHERE key = $1', ['registrationEnabled']);
+  return result.rows[0] ? result.rows[0].value === 'true' : true;
 }
 
 async function setRegistrationEnabled(enabled) {
-  await db.run('UPDATE settings SET value = ? WHERE key = ?', [enabled ? 'true' : 'false', 'registrationEnabled']);
+  await pool.query('UPDATE settings SET value = $1 WHERE key = $2', [enabled ? 'true' : 'false', 'registrationEnabled']);
 }
 
 module.exports = {
