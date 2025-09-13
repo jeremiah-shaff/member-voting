@@ -92,10 +92,6 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 SERVICE
 
-sudo systemctl daemon-reload
-sudo systemctl enable member-voting-backend
-sudo systemctl start member-voting-backend
-
 # Configure Nginx
 sudo tee /etc/nginx/sites-available/member-voting > /dev/null <<NGINX
 server {
@@ -139,6 +135,12 @@ if [ ! -d "$CERT_DIR" ]; then
   sudo mkdir "$CERT_DIR"
 fi
 sudo chown -R $USER:$USER "$CERT_DIR"
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable member-voting-backend
+sudo systemctl start member-voting-backend
+
 
 # Optional: Setup HTTPS with Certbot
 # sudo certbot --nginx -d your.domain.com --non-interactive --agree-tos -m admin@your.domain.com
