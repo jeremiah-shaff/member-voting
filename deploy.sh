@@ -2,6 +2,11 @@
 # Deployment script for member-voting app on Ubuntu
 set -e
 
+generate_secure_string() {
+  local length=$1
+  head -c 32 /dev/urandom | base64 | tr -d '\n' | head -c "$length"
+}
+
 # Variables
 APP_DIR="/opt/member-voting"
 REPO_URL="https://github.com/jeremiah-shaff/member-voting.git"
@@ -12,6 +17,7 @@ POSTGRES_PASSWORD="securepassword"
 FQDN="your.domain.com"
 ACME_EMAIL="admin@your.domain.com"
 CERT_DIR="/opt/certs"
+INTERNAL_SECRET=$(generate_secure_string 32)  # Set a strong secret here
 
 # Update and install dependencies
 sudo apt update
@@ -65,6 +71,7 @@ FQDN=$FQDN
 ACME_EMAIL=$ACME_EMAIL
 CERT_DIR=$CERT_DIR
 APP_DIR=$APP_DIR
+INTERNAL_SECRET=$INTERNAL_SECRET
 ENV
 
 # Setup systemd service for backend

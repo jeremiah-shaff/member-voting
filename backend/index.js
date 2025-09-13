@@ -50,12 +50,31 @@ const PORT = process.env.PORT || 4000;
 const FQDN = process.env.FQDN;
 const keyPath = CERT_DIR + '/privkey.pem';
 const certPath = CERT_DIR + '/cert.pem';
-if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-  const key = fs.readFileSync(keyPath);
-  const cert = fs.readFileSync(certPath);
+
+async function rebuildNginxConfigIfCertsPresent() {
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    // Wait for server to start before making request
+    setTimeout(async () => {
+      try {
+        const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+        await fetch(`http://localhost:${PORT}/api/rebuild-nginx-config`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': process.env.INTERNAL_SECRET || 'internal_secret',
+          },
+        });
+        console.log('Rebuilt nginx config at startup.');
+      } catch (err) {
+        console.error('Failed to rebuild nginx config at startup:', err);
+      }
+    }, 2000);
+  }
 }
+
 app.listen(PORT, () => {
   console.log(`HTTP server running on port ${PORT}`);
   // Start auto-renewal scheduler
   require('./renewal');
+  rebuildNginxConfigIfCertsPresent();
 });

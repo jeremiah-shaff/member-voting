@@ -202,7 +202,16 @@ router.post('/request-certificate', authenticateToken, requireAdmin, async (req,
 });
 
 // Admin: rebuild nginx config for HTTPS with existing certificate files
-router.post('/rebuild-nginx-config', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/rebuild-nginx-config', async (req, res, next) => {
+  // Internal request bypass
+  if (req.headers['x-internal-secret'] === process.env.INTERNAL_SECRET) {
+    req.isInternal = true;
+    return next();
+  }
+  authenticateToken(req, res, function() {
+    requireAdmin(req, res, next);
+  });
+}, async (req, res) => {
   // Use FQDN from branding table
   try {
     const pool = req.pool;
