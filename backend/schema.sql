@@ -83,3 +83,13 @@ CREATE TABLE branding (
 );
 
 INSERT INTO branding (bg_color, nav_color, nav_text_color, text_color, button_color, fqdn) VALUES ('#545454', '#b3adad', '#ffffff', '#ffffff', '#1e4166', 'localhost');
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+-- Insert default registrationEnabled value if not exists
+INSERT INTO settings (key, value)
+SELECT 'registrationEnabled', 'true'
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'registrationEnabled');

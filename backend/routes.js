@@ -9,6 +9,7 @@ const router = express.Router();
 const CERT_DIR = path.join(__dirname, 'certs');
 const CERT_FILE = path.join(CERT_DIR, 'cert.pem');
 const { X509Certificate } = require('crypto');
+const { setRegistrationEnabled, getRegistrationEnabled } = require('./db');
 
 // Auth routes
 
@@ -254,8 +255,21 @@ router.post('/rebuild-nginx-config', authenticateToken, requireAdmin, async (req
   }
 });
 
+// Registration enabled API
+router.get('/registration-enabled', async (req, res) => {
+  res.json({ enabled: await getRegistrationEnabled() });
+});
+router.post('/registration-enabled', async (req, res) => {
+  if (!req.user || !req.user.is_admin) return res.status(403).json({ error: 'Forbidden' });
+  await setRegistrationEnabled(!!req.body.enabled);
+  res.json({ enabled: await getRegistrationEnabled() });
+});
+
 // Register member or admin
 router.post('/auth/register', async (req, res) => {
+  if (!(await getRegistrationEnabled())) {
+    return res.status(403).json({ error: 'Registration is currently disabled.' });
+  }
   let { username, password, is_admin } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   username = username.toLowerCase(); // Make username case insensitive

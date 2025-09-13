@@ -11,4 +11,17 @@ async function getFqdnFromDb() {
   return result.rows[0]?.fqdn || process.env.FQDN;
 }
 
-module.exports = { getFqdnFromDb };
+async function getRegistrationEnabled() {
+  const row = await db.get('SELECT value FROM settings WHERE key = ?', ['registrationEnabled']);
+  return row ? row.value === 'true' : true;
+}
+
+async function setRegistrationEnabled(enabled) {
+  await db.run('UPDATE settings SET value = ? WHERE key = ?', [enabled ? 'true' : 'false', 'registrationEnabled']);
+}
+
+module.exports = {
+  getFqdnFromDb,
+  setRegistrationEnabled,
+  getRegistrationEnabled,
+};
