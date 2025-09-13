@@ -32,3 +32,19 @@ export async function apiRequest(path, method = 'GET', body, token) {
   }
   return res.json();
 }
+
+export async function getRegistrationEnabled() {
+  const res = await fetch('/api/registration-enabled');
+  if (!res.ok) throw new Error('Failed to fetch registration status');
+  return (await res.json()).enabled;
+}
+export async function setRegistrationEnabled(enabled) {
+  const res = await fetch('/api/registration-enabled', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('Failed to update registration status');
+  return (await res.json()).enabled;
+}

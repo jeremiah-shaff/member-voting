@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
-import { apiRequest } from '../api.jsx';
+import React, { useState, useEffect } from 'react';
+import { apiRequest, getRegistrationEnabled } from '../api';
 
 export default function RegisterPage({ branding }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+
+  useEffect(() => {
+    getRegistrationEnabled().then(setRegistrationEnabled).catch(() => setRegistrationEnabled(true));
+  }, []);
 
   const handleRegister = async (e) => {
     e.preventDefault();
-  const res = await apiRequest('/auth/register', 'POST', { username, password });
+    const res = await apiRequest('/auth/register', 'POST', { username, password });
     if (res.id) {
       setSuccess('Registration successful! You can now log in.');
       setError('');
@@ -18,6 +23,10 @@ export default function RegisterPage({ branding }) {
       setSuccess('');
     }
   };
+
+  if (!registrationEnabled) {
+    return <div style={{ color: 'red', marginTop: '2em' }}>Registration is currently disabled.</div>;
+  }
 
   return (
     <div>

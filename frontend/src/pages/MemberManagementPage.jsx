@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiRequest } from '../api.jsx';
+import { apiRequest, getRegistrationEnabled, setRegistrationEnabled } from '../api';
 
 export default function MemberManagementPage({ branding }) {
   const [members, setMembers] = useState([]);
@@ -8,6 +8,7 @@ export default function MemberManagementPage({ branding }) {
   const [form, setForm] = useState({ username: '', password: '', is_admin: false });
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ username: '', password: '', is_admin: false });
+  const [registrationEnabled, setRegistrationEnabledState] = useState(true);
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('token');
@@ -17,6 +18,10 @@ export default function MemberManagementPage({ branding }) {
   };
 
   useEffect(() => { fetchMembers(); }, []);
+
+  useEffect(() => {
+    getRegistrationEnabled().then(setRegistrationEnabledState);
+  }, []);
 
   const handleAdd = async e => {
     e.preventDefault();
@@ -68,6 +73,12 @@ export default function MemberManagementPage({ branding }) {
     }
   };
 
+  const handleToggle = async () => {
+    const newVal = !registrationEnabled;
+    await setRegistrationEnabled(newVal);
+    setRegistrationEnabledState(newVal);
+  };
+
   return (
     <div>
       <h2>Member Management</h2>
@@ -80,6 +91,12 @@ export default function MemberManagementPage({ branding }) {
         </label>
   <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add</button>
       </form>
+      <div style={{ margin: '1em 0', padding: '1em', border: '1px solid #ccc', borderRadius: '8px', background: '#f9f9f9' }}>
+  <label style={{ fontWeight: 'bold' }}>
+    <input type="checkbox" checked={registrationEnabled} onChange={handleToggle} />
+    Enable new user registration
+  </label>
+</div>
       <h4>Members</h4>
       <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
         <thead>
