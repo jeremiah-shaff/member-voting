@@ -12,6 +12,7 @@ import MemberManagementPage from './pages/MemberManagementPage.jsx';
 import BrandingPage from './pages/BrandingPage.jsx';
 import CommitteeManagementPage from './pages/CommitteeManagementPage.jsx';
 import BallotAdminQRPage from './pages/BallotAdminQRPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 
 function App() {
   const [branding, setBranding] = useState({ bg_color: '', nav_color: '', text_color: '', fqdn: '', logo_path: '', icon_path: '' });
@@ -87,6 +88,7 @@ function App() {
               <Route path="/admin/branding" element={<BrandingPage branding={branding} />} />
               <Route path="/admin/committees" element={<CommitteeManagementPage branding={branding} />} />
               <Route path="/admin/ballot/:id/qr" element={<BallotAdminQRPage />} />
+              <Route path="/change-password" element={<ChangePasswordPage branding={branding} />} />
             </Routes>
           </div>
         </Router>
