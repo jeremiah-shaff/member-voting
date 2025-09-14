@@ -16,14 +16,13 @@ export default function BallotListPage({ branding }) {
           const timezone = branding?.timezone || 'UTC';
           const now = DateTime.now().setZone(timezone);
           filtered = res.filter(b => {
-            let started = false;
-            let ended = false;
-            const start = b.start_time;
-            const end = b.end_time;
-            if (now > start) started = true;
-            if (now > end) ended = true;
-            if (started && !ended) return true;
-            return false;
+            const timezone = branding?.timezone || 'UTC';
+            const now = DateTime.now().setZone(timezone);
+            // Ballot is listed only if now >= start_time and now < end_time
+            if (!b.start_time || !b.end_time) return false;
+            const start = DateTime.fromISO(b.start_time, { zone: timezone });
+            const end = DateTime.fromISO(b.end_time, { zone: timezone });
+            return now >= start && now < end;
           });
         }
         setBallots(filtered);

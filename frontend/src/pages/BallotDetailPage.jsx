@@ -37,17 +37,13 @@ export default function BallotDetailPage({ branding }) {
   // Ballot expired and not-yet-open logic
   let expired = false;
   let notYetOpen = false;
-  if (ballot.end_time || ballot.start_time) {
+  if (ballot.end_time && ballot.start_time) {
     const timezone = branding?.timezone || 'UTC';
     const now = DateTime.now().setZone(timezone);
-    if (ballot.end_time) {
-      const end = ballot.end_time;
-      expired = end <= now;
-    }
-    if (ballot.start_time) {
-      const start = ballot.start_time;
-      notYetOpen = now < start;
-    }
+    const start = DateTime.fromISO(ballot.start_time, { zone: timezone });
+    const end = DateTime.fromISO(ballot.end_time, { zone: timezone });
+    expired = now >= end;
+    notYetOpen = now < start;
   }
 
   return (
