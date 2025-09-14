@@ -8,6 +8,7 @@ export default function BallotAuditPage({ branding }) {
   const [paperVotes, setPaperVotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [ballotDetails, setBallotDetails] = useState(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   const isAuthenticated = !!token;
@@ -38,6 +39,11 @@ export default function BallotAuditPage({ branding }) {
           setPaperVotes(paperSummary);
         }
       });
+    // Fetch ballot details
+    apiRequest(`/ballots/${id}`, 'GET', null, token)
+      .then(res => {
+        if (res.id) setBallotDetails(res);
+      });
   }, [id, isAuthenticated, token]);
 
   if (!isAuthenticated) {
@@ -56,6 +62,27 @@ export default function BallotAuditPage({ branding }) {
   return (
     <div style={{ maxWidth: 600, margin: '2em auto', background: branding?.box_bg_color || branding?.bg_color || '#fff', borderRadius: 12, boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`, border: `2px solid ${branding?.box_border_color || '#eee'}`, padding: '2em', color: branding?.text_color || '#222' }}>
       <h2 style={{ color: branding?.nav_text_color || branding?.text_color || '#222' }}>Ballot Audit</h2>
+      {ballotDetails && (
+        <div style={{marginBottom:'1em', padding:'1em', background:branding?.box_bg_color || '#f8f8f8', borderRadius:'8px', border:`1px solid ${branding?.box_border_color || '#ccc'}`}}>
+          <h3 style={{margin:'0 0 0.5em 0', color:branding?.nav_text_color || branding?.text_color || '#222'}}>{ballotDetails.title}</h3>
+          <div style={{marginBottom:'0.5em', color:branding?.text_color || '#555'}}>{ballotDetails.description}</div>
+          <div style={{fontSize:'0.95em', color:branding?.text_color || '#555'}}>
+            <strong>Start Time:</strong> {ballotDetails.start_time}<br />
+            <strong>End Time:</strong> {ballotDetails.end_time}
+          </div>
+          <div style={{marginTop:'0.5em'}}>
+            <strong>Measures:</strong>
+            <ul style={{paddingLeft:'1em'}}>
+              {ballotDetails.measures && ballotDetails.measures.map(m => (
+                <li key={m.id} style={{marginBottom:'0.25em'}}>
+                  <span style={{fontWeight:'bold'}}>{m.measure_text}</span>
+                  {m.measure_description && <span style={{marginLeft:'0.5em', color:branding?.text_color || '#888'}}>{m.measure_description}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
       <p>This report lists all members who voted on this ballot. No vote values are shown.</p>
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {voters.length === 0 ? (

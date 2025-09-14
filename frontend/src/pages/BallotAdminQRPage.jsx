@@ -52,7 +52,7 @@ export default function BallotAdminQRPage({ branding }) {
     }}>
       <h2 style={{ color: branding?.text_color || branding?.text_color || '#222' }}>Live Voting QR Code</h2>
       <p>Members can scan this QR code to quickly access the ballot during a live vote.</p>
-      <div style={{ background: branding?.bg_color || '#fff', padding: '16px', display: 'inline-block', borderRadius: '8px' }}>
+      <div style={{ background: branding?.box_bg_color || '#fff', padding: '16px', display: 'inline-block', borderRadius: '8px' }}>
         <QRCode value={ballotUrl} size={220} fgColor={branding?.text_color || '#222'} />
       </div>
       <div style={{ marginTop: '1.5em' }}>

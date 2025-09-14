@@ -87,7 +87,14 @@ export default function EditBallotPage({ branding }) {
   if (!ballot) return <div>Loading...</div>;
 
   return (
-    <div>
+    <div style={{
+      marginBottom: '2em',
+      padding: '2em',
+      borderRadius: '12px',
+      background: branding?.box_bg_color || branding?.bg_color || '#fff',
+      border: `2px solid ${branding?.box_border_color || '#eee'}`,
+      boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+    }}>
       <h2>Edit Ballot</h2>
       <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'16px', maxWidth:'500px', margin:'0 auto'}}>
         <label>Assign to Committee (optional)<br />
@@ -132,6 +139,7 @@ export default function EditBallotPage({ branding }) {
         <br /><br />
         <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Update Ballot</button>
       </form>
+      <div style={{marginTop:'8px', color:'red', fontSize:'0.95em'}}>* Required fields: Title, Start Time, End Time, at least one Measure with a title</div>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}
     </div>
