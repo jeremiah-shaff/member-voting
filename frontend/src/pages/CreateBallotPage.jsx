@@ -56,7 +56,14 @@ export default function CreateBallotPage({ branding }) {
   };
 
   return (
-    <div>
+    <div style={{
+  marginBottom: '2em',
+  padding: '2em',
+  borderRadius: '12px',
+  background: branding?.box_bg_color || branding?.bg_color || '#fff',
+  border: `2px solid ${branding?.box_border_color || '#eee'}`,
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+}}>
       <h2>Create Ballot</h2>
   <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'16px', maxWidth:'500px', margin:'0 auto'}}>
         <label>Assign to Committee (optional)<br />

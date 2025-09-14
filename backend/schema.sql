@@ -79,7 +79,10 @@ CREATE TABLE branding (
     button_color VARCHAR(32),
     fqdn VARCHAR(255),
     logo_path VARCHAR(255),
-    icon_path VARCHAR(255)
+    icon_path VARCHAR(255),
+    box_border_color VARCHAR(32),
+    box_shadow_color VARCHAR(32),
+    box_bg_color VARCHAR(32)
 );
 
 INSERT INTO branding (bg_color, nav_color, nav_text_color, text_color, button_color, fqdn) VALUES ('#545454', '#b3adad', '#ffffff', '#ffffff', '#1e4166', 'localhost');

@@ -111,7 +111,14 @@ export default function CommitteeManagementPage({ branding }) {
       <h3>Committees</h3>
       <ul style={{listStyle:'none', padding:0}}>
         {committees.map(c => (
-          <li key={c.id} style={{marginBottom:'32px', border:'2px solid #007bff', borderRadius:'12px', boxShadow:'0 2px 8px rgba(0,0,0,0.07)', padding:'20px', background:'#f8faff'}}>
+          <li key={c.id} style={{
+  marginBottom: '32px',
+  border: `2px solid ${branding?.box_border_color || '#007bff'}`,
+  borderRadius: '12px',
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || 'rgba(0,0,0,0.07)'}`,
+  padding: '20px',
+  background: branding?.box_bg_color || '#f8faff',
+}}>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
               <div>
                 <strong style={{fontSize:'1.2em'}}>{c.name}</strong>

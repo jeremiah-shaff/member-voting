@@ -69,14 +69,14 @@ router.get('/branding', async (req, res) => {
 
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
-  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn } = req.body;
+  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, logo_path, icon_path, box_border_color, box_shadow_color, box_bg_color } = req.body;
   try {
     const pool = req.pool;
     // Upsert branding row
     const brand_id = (await pool.query('SELECT id FROM branding')).rows[0].id;
     const result = await pool.query(
-      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6 WHERE id = $7 RETURNING *',
-      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', brand_id]
+      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6, logo_path = $7, icon_path = $8, box_border_color = $9, box_shadow_color = $10, box_bg_color = $11 WHERE id = $12 RETURNING *',
+      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', logo_path || '', icon_path || '', box_border_color || '', box_shadow_color || '', box_bg_color || '', brand_id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -875,6 +875,24 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// Admin: audit members who voted on a ballot (no vote values exposed)
+router.get('/ballots/:id/audit', authenticateToken, requireAdmin, async (req, res) => {
+  const ballotId = req.params.id;
+  try {
+    const pool = req.pool;
+    const result = await pool.query(
+      `SELECT DISTINCT m.id, m.username, m.created_at
+       FROM votes v
+       JOIN members m ON v.member_id = m.id
+       WHERE v.ballot_id = $1`,
+      [ballotId]
+    );
+    res.json({ ballot_id: ballotId, voters: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to audit ballot voters' });
   }
 });
 
