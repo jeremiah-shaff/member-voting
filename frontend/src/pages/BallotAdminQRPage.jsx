@@ -7,7 +7,7 @@ export default function BallotAdminQRPage({ branding }) {
   const { id } = useParams();
   const [ballot, setBallot] = useState(null);
   const [loading, setLoading] = useState(true);
-  const ballotUrl = `${window.location.origin}/ballot/${id}`;
+  const ballotUrl = `${window.location.origin}/ballots/${id}`;
   const reportUrl = `/admin/ballot/${id}/report`;
   const navigate = useNavigate();
 
@@ -57,12 +57,12 @@ export default function BallotAdminQRPage({ branding }) {
       <div style={{ marginTop: '1.5em' }}>
         <Link to={reportUrl} style={{
           fontWeight: 'bold',
-          color: branding?.button_color || '#1976d2',
+          color: branding?.text_color || '#1976d2',
           textDecoration: 'none',
           fontSize: '1.1em',
           borderRadius: '4px',
           padding: '8px 16px',
-          background: branding?.nav_color || '#f5f5f5',
+          background: branding?.button_color || '#f5f5f5',
           display: 'inline-block',
         }}>
           View Ballot Report
