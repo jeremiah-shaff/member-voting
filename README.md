@@ -1,4 +1,5 @@
 # Member Voting Web Application
+<img width="755" height="658" alt="image" src="https://github.com/user-attachments/assets/9f25ee4e-672a-4f26-b14b-6f6978f6c3c1" />
 
 ## Overview
 
