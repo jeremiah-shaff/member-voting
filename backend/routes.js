@@ -858,4 +858,24 @@ router.get('/ballots/:id/report', authenticateToken, requireAdmin, async (req, r
   }
 });
 
+// Change password (authenticated user)
+router.post('/change-password', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    const pool = req.pool;
+    const userResult = await pool.query('SELECT password FROM members WHERE id = $1', [userId]);
+    if (!userResult.rows.length) return res.status(404).json({ error: 'User not found' });
+    const user = userResult.rows[0];
+    const match = await bcrypt.compare(oldPassword, user.password);
+    if (!match) return res.status(403).json({ error: 'Current password is incorrect' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE members SET password = $1 WHERE id = $2', [hashed, userId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
 module.exports = router;

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import QRCode from 'react-qr-code';
 import { getBallot } from '../api';
 
 export default function BallotAdminQRPage({ branding }) {
   const { id } = useParams();
-  const QRCode = require('qrcode.react');
   const [ballot, setBallot] = useState(null);
   const [loading, setLoading] = useState(true);
   const ballotUrl = `${window.location.origin}/ballot/${id}`;
@@ -33,7 +33,9 @@ export default function BallotAdminQRPage({ branding }) {
     }}>
       <h2 style={{ color: branding?.nav_text_color || branding?.text_color || '#222' }}>Live Voting QR Code</h2>
       <p>Members can scan this QR code to quickly access the ballot during a live vote.</p>
-      <QRCode value={ballotUrl} size={220} bgColor={branding?.bg_color || '#fff'} fgColor={branding?.nav_text_color || '#222'} />
+      <div style={{ background: branding?.bg_color || '#fff', padding: '16px', display: 'inline-block', borderRadius: '8px' }}>
+        <QRCode value={ballotUrl} size={220} fgColor={branding?.nav_text_color || '#222'} />
+      </div>
       <div style={{ marginTop: '1.5em' }}>
         <Link to={reportUrl} style={{
           fontWeight: 'bold',

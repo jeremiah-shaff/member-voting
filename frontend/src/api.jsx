@@ -58,3 +58,21 @@ export async function getBallot(id) {
   if (!res.ok) throw new Error('Failed to fetch ballot');
   return await res.json();
 }
+
+export async function changePassword(oldPassword, newPassword) {
+  const token = localStorage.getItem('token');
+  const res = await fetch('/api/change-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ oldPassword, newPassword }),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to change password');
+  }
+  return await res.json();
+}
