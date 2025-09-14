@@ -23,7 +23,16 @@ export default function BallotAdminReportPage({ branding }) {
 
   if (!isAuthenticated) {
     return (
-      <div style={{ maxWidth: 600, margin: '2em auto', textAlign: 'center', background: branding?.bg_color || '#fff', borderRadius: 12, boxShadow: '0 2px 8px #ccc', padding: '2em', color: branding?.text_color || '#222' }}>
+      <div style={{
+  maxWidth: 600,
+  margin: '2em auto',
+  background: branding?.box_bg_color || branding?.bg_color || '#fff',
+  borderRadius: 12,
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+  border: `2px solid ${branding?.box_border_color || '#eee'}`,
+  padding: '2em',
+  color: branding?.text_color || '#222',
+}}>
         <h2 style={{ color: branding?.nav_text_color || branding?.text_color || '#222' }}>Ballot Report</h2>
         <p>You must be logged in to view this page.</p>
         <button onClick={() => navigate('/login')} style={{ background: branding?.button_color || '#007bff', color: branding?.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '8px 16px', fontWeight: 'bold', marginTop: '1em' }}>Go to Login</button>

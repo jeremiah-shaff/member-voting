@@ -43,9 +43,10 @@ export default function BallotAdminQRPage({ branding }) {
       maxWidth: 500,
       margin: '2em auto',
       textAlign: 'center',
-      background: branding?.bg_color || '#fff',
+      background: branding?.box_bg_color || branding?.bg_color || '#fff',
       borderRadius: 12,
-      boxShadow: '0 2px 8px #ccc',
+      boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+      border: `2px solid ${branding?.box_border_color || '#eee'}`,
       padding: '2em',
       color: branding?.text_color || '#222',
     }}>

@@ -91,7 +91,14 @@ export default function MemberManagementPage({ branding }) {
         </label>
   <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Add</button>
       </form>
-      <div style={{ margin: '1em 0', padding: '1em', border: '1px solid #ccc', borderRadius: '8px', background: '#f9f9f9' }}>
+      <div style={{
+  margin: '1em 0',
+  padding: '1em',
+  border: `1px solid ${branding?.box_border_color || '#ccc'}`,
+  borderRadius: '8px',
+  background: branding?.box_bg_color || '#f9f9f9',
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+}}>
   <label style={{ fontWeight: 'bold' }}>
     <input type="checkbox" checked={registrationEnabled} onChange={handleToggle} />
     Enable new user registration

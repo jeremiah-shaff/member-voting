@@ -69,6 +69,18 @@ export default function BrandingPage() {
   <label>Navigation Bar Text Color <input type="color" value={form.nav_text_color} onChange={e => setForm(f => ({ ...f, nav_text_color: e.target.value }))} /></label><br />
   <label>Text Color <input type="color" value={form.text_color} onChange={e => setForm(f => ({ ...f, text_color: e.target.value }))} /></label><br />
   <label>Button Color <input type="color" value={form.button_color} onChange={e => setForm(f => ({ ...f, button_color: e.target.value }))} /></label><br />
+  <label>Box Border Color <input type="color" value={form.box_border_color || ''} onChange={e => setForm(f => ({ ...f, box_border_color: e.target.value }))} /></label><br />
+  <label>Box Shadow Color <input type="color" value={form.box_shadow_color || ''} onChange={e => setForm(f => ({ ...f, box_shadow_color: e.target.value }))} /></label><br />
+  <label>Box Background Color <input type="color" value={form.box_bg_color || ''} onChange={e => setForm(f => ({ ...f, box_bg_color: e.target.value }))} /></label><br />
+  <ul style={{listStyle:'none', padding:0}}>
+  <li style={{
+  marginBottom: '32px',
+  border: `2px solid ${branding?.box_border_color || '#007bff'}`,
+  borderRadius: '12px',
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || 'rgba(0,0,0,0.07)'}`,
+  padding: '20px',
+  background: branding?.box_bg_color || '#f8faff',
+}}>
   <label>Site FQDN <input value={form.fqdn} onChange={e => setForm(f => ({ ...f, fqdn: e.target.value }))} /></label>
   <button
     type="button"
@@ -141,7 +153,9 @@ export default function BrandingPage() {
         setError('Network error: ' + err.toString());
       }
     }}
-  >Rebuild HTTPS Config</button><br />
+  >Rebuild HTTPS Config</button>
+  </li>
+  </ul><br />
   <button type="submit" style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop: '8px'}}>Update Branding</button>
       </form>
       <div style={{marginBottom:'2em'}}>

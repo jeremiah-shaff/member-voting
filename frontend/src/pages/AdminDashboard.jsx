@@ -51,24 +51,57 @@ export default function AdminDashboard({ branding }) {
                   : 'Open to all members'}
               </span>
               <button onClick={() => fetchReport(b.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}} >View Report</button>
-              <a href={`/admin/edit-ballot/${b.id}`}>
-                <button
-                  style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}
-                  disabled={!b.is_visible}
-                  title={!b.is_visible ? 'You are not a member of the relevant committee' : ''}
-                >Edit</button>
-              </a>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '8px' }}>
+                <Link to={`/admin/ballot/${b.id}/edit`} style={{
+                  background: branding?.button_color || '#007bff',
+                  color: branding?.text_color || '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  minWidth: '70px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+                }}>Edit</Link>
+                <Link to={`/admin/ballot/${b.id}/qr`} style={{
+                  background: branding?.button_color || '#1976d2',
+                  color: branding?.text_color || '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  minWidth: '70px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+                }}>Live</Link>
+                <Link to={`/admin/ballot/${b.id}/audit`} style={{
+                  background: branding?.button_color || '#6c757d',
+                  color: branding?.text_color || '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  minWidth: '70px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+                }}>Audit</Link>
+                <Link to={`/admin/ballot/${b.id}/report`} style={{
+                  background: branding?.button_color || '#28a745',
+                  color: branding?.text_color || '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  minWidth: '70px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+                }}>Report</Link>
+              </div>
               <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
-              <Link to={`/admin/ballot/${b.id}/qr`} style={{
-                background: (branding?.button_color || '#007bff'),
-                color: (branding?.text_color || '#fff'),
-                border: 'none',
-                borderRadius: '4px',
-                padding: '4px 12px',
-                marginLeft: '8px',
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}>Live</Link>
             </li>
           );
         })}
