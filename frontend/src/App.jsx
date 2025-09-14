@@ -88,7 +88,7 @@ function App() {
               <Route path="/admin/members" element={<MemberManagementPage branding={branding} />} />
               <Route path="/admin/branding" element={<BrandingPage branding={branding} />} />
               <Route path="/admin/committees" element={<CommitteeManagementPage branding={branding} />} />
-              <Route path="/admin/ballot/:id/qr" element={<BallotAdminQRPage />} />
+              <Route path="/admin/ballot/:id/qr" element={<BallotAdminQRPage branding={branding} />} />
               <Route path="/admin/ballot/:id/report" element={<BallotAdminReportPage branding={branding} />} />
               <Route path="/change-password" element={<ChangePasswordPage branding={branding} />} />
             </Routes>
