@@ -53,12 +53,6 @@ export async function setRegistrationEnabled(enabled) {
   return (await res.json()).enabled;
 }
 
-export async function getBallot(id) {
-  const res = await fetch(`/api/ballots/${id}`, { credentials: 'include' });
-  if (!res.ok) throw new Error('Failed to fetch ballot');
-  return await res.json();
-}
-
 export async function changePassword(oldPassword, newPassword) {
   const token = localStorage.getItem('token');
   const res = await fetch('/api/change-password', {

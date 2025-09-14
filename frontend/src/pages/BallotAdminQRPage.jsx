@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
-import { getBallot } from '../api';
+import { apiRequest } from '../api';
 
 export default function BallotAdminQRPage({ branding }) {
   const { id } = useParams();
@@ -9,13 +9,31 @@ export default function BallotAdminQRPage({ branding }) {
   const [loading, setLoading] = useState(true);
   const ballotUrl = `${window.location.origin}/ballot/${id}`;
   const reportUrl = `/admin/ballot/${id}/report`;
+  const navigate = useNavigate();
+
+  // Check authentication
+  const token = localStorage.getItem('token');
+  const isAuthenticated = !!token;
 
   useEffect(() => {
-    getBallot(id).then(b => {
-      setBallot(b);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [id]);
+    if (!isAuthenticated) return;
+    apiRequest(`/ballots/${id}`, 'GET', undefined, token)
+      .then(b => {
+        setBallot(b);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [id, isAuthenticated, token]);
+
+  if (!isAuthenticated) {
+    return (
+      <div style={{ maxWidth: 500, margin: '2em auto', textAlign: 'center', background: branding?.bg_color || '#fff', borderRadius: 12, boxShadow: '0 2px 8px #ccc', padding: '2em', color: branding?.text_color || '#222' }}>
+        <h2 style={{ color: branding?.nav_text_color || branding?.text_color || '#222' }}>Live Voting QR Code</h2>
+        <p>You must be logged in to view this page.</p>
+        <button onClick={() => navigate('/login')} style={{ background: branding?.button_color || '#007bff', color: branding?.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '8px 16px', fontWeight: 'bold', marginTop: '1em' }}>Go to Login</button>
+      </div>
+    );
+  }
 
   if (loading) return <div>Loading...</div>;
   if (!ballot) return <div>Ballot not found.</div>;
