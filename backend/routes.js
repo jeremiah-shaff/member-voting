@@ -542,9 +542,10 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
     const ballotResult = await pool.query('SELECT start_time, end_time FROM ballots WHERE id = $1', [ballotId]);
     if (ballotResult.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
     const now = DateTime.now().setZone(timezone);
-    const start = ballotResult.rows[0].start_time;
-    const end = ballotResult.rows[0].end_time;
-    if (now < start || now > end) return res.status(403).json({ error: 'Voting is not open for this ballot' });
+    const start = DateTime.fromISO(ballotResult.rows[0].start_time, { zone: timezone });
+    const end = DateTime.fromISO(ballotResult.rows[0].end_time, { zone: timezone });
+    if (now < start) return res.status(403).json({ error: 'Voting has not started yet for this ballot' });
+    if (now >= end) return res.status(403).json({ error: 'Voting is not open for this ballot' });
     // Prevent duplicate votes per measure per member
     for (const v of votes) {
       const exists = await pool.query('SELECT id FROM votes WHERE ballot_id = $1 AND measure_id = $2 AND member_id = $3 AND vote_type = $4', [ballotId, v.measure_id, req.user.id, 'electronic']);
