@@ -542,8 +542,8 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
     const ballotResult = await pool.query('SELECT start_time, end_time FROM ballots WHERE id = $1', [ballotId]);
     if (ballotResult.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
     const now = DateTime.now().setZone(timezone);
-    const start = DateTime.fromISO(ballotResult.rows[0].start_time, { zone: timezone });
-    const end = DateTime.fromISO(ballotResult.rows[0].end_time, { zone: timezone });
+    const start = ballotResult.rows[0].start_time;
+    const end = ballotResult.rows[0].end_time;
     if (now < start || now > end) return res.status(403).json({ error: 'Voting is not open for this ballot' });
     // Prevent duplicate votes per measure per member
     for (const v of votes) {
