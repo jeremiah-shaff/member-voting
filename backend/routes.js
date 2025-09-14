@@ -10,6 +10,7 @@ const CERT_DIR = path.join(__dirname, 'certs');
 const CERT_FILE = path.join(CERT_DIR, 'cert.pem');
 const { X509Certificate } = require('crypto');
 const { setRegistrationEnabled, getRegistrationEnabled } = require('./db');
+const { DateTime } = require('luxon');
 
 // Auth routes
 
@@ -69,14 +70,14 @@ router.get('/branding', async (req, res) => {
 
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
-  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, logo_path, icon_path, box_border_color, box_shadow_color, box_bg_color } = req.body;
+  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, logo_path, icon_path, box_border_color, box_shadow_color, box_bg_color, timezone } = req.body;
   try {
     const pool = req.pool;
     // Upsert branding row
     const brand_id = (await pool.query('SELECT id FROM branding')).rows[0].id;
     const result = await pool.query(
-      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6, logo_path = $7, icon_path = $8, box_border_color = $9, box_shadow_color = $10, box_bg_color = $11 WHERE id = $12 RETURNING *',
-      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', logo_path || '', icon_path || '', box_border_color || '', box_shadow_color || '', box_bg_color || '', brand_id]
+      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6, logo_path = $7, icon_path = $8, box_border_color = $9, box_shadow_color = $10, box_bg_color = $11, timezone = $12 WHERE id = $13 RETURNING *',
+      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', logo_path || '', icon_path || '', box_border_color || '', box_shadow_color || '', box_bg_color || '', timezone || '', brand_id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -534,12 +535,15 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
   }
   try {
     const pool = req.pool;
+    // Get branding timezone
+    const brandingResult = await pool.query('SELECT timezone FROM branding ORDER BY id DESC LIMIT 1');
+    const timezone = brandingResult.rows[0]?.timezone || 'UTC';
     // Check ballot timing
     const ballotResult = await pool.query('SELECT start_time, end_time FROM ballots WHERE id = $1', [ballotId]);
     if (ballotResult.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
-    const now = new Date();
-    const start = new Date(ballotResult.rows[0].start_time);
-    const end = new Date(ballotResult.rows[0].end_time);
+    const now = DateTime.now().setZone(timezone);
+    const start = DateTime.fromISO(ballotResult.rows[0].start_time, { zone: timezone });
+    const end = DateTime.fromISO(ballotResult.rows[0].end_time, { zone: timezone });
     if (now < start || now > end) return res.status(403).json({ error: 'Voting is not open for this ballot' });
     // Prevent duplicate votes per measure per member
     for (const v of votes) {

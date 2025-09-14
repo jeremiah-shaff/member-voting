@@ -19,6 +19,9 @@ export default function BrandingPage() {
           nav_text_color: res.nav_text_color || '',
           text_color: res.text_color || '',
           button_color: res.button_color || '',
+          box_border_color: res.box_border_color || '',
+          box_shadow_color: res.box_shadow_color || '',
+          box_bg_color: res.box_bg_color || '',
           fqdn: res.fqdn || ''
         });
       }
@@ -72,6 +75,20 @@ export default function BrandingPage() {
   <label>Box Border Color <input type="color" value={form.box_border_color || ''} onChange={e => setForm(f => ({ ...f, box_border_color: e.target.value }))} /></label><br />
   <label>Box Shadow Color <input type="color" value={form.box_shadow_color || ''} onChange={e => setForm(f => ({ ...f, box_shadow_color: e.target.value }))} /></label><br />
   <label>Box Background Color <input type="color" value={form.box_bg_color || ''} onChange={e => setForm(f => ({ ...f, box_bg_color: e.target.value }))} /></label><br />
+  <label>Timezone
+  <select value={form.timezone || ''} onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}>
+    <option value="">Select Timezone</option>
+    <option value="America/Los_Angeles">America/Los_Angeles</option>
+    <option value="America/Denver">America/Denver</option>
+    <option value="America/Chicago">America/Chicago</option>
+    <option value="America/New_York">America/New_York</option>
+    <option value="UTC">UTC</option>
+    <option value="Europe/London">Europe/London</option>
+    <option value="Europe/Berlin">Europe/Berlin</option>
+    <option value="Asia/Tokyo">Asia/Tokyo</option>
+    <option value="Australia/Sydney">Australia/Sydney</option>
+  </select>
+</label>
   <ul style={{listStyle:'none', padding:0}}>
   <li style={{
   marginBottom: '32px',
