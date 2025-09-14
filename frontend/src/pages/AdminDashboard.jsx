@@ -70,7 +70,7 @@ export default function AdminDashboard({ branding }) {
                   textAlign: 'center',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
                 }}>Audit</Link>
-                <Link to={`/admin/ballot/${b.id}/edit`} style={{
+                <Link to={`/editballot/${b.id}`} style={{
                   background: branding?.button_color || '#007bff',
                   color: branding?.text_color || '#fff',
                   border: 'none',
@@ -82,8 +82,8 @@ export default function AdminDashboard({ branding }) {
                   textAlign: 'center',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
                 }}>Edit</Link>
+                <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
               </div>
-              <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
             </li>
           );
         })}

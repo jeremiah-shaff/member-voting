@@ -70,14 +70,14 @@ router.get('/branding', async (req, res) => {
 
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
-  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, logo_path, icon_path, box_border_color, box_shadow_color, box_bg_color, timezone } = req.body;
+  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, box_border_color, box_shadow_color, box_bg_color, timezone } = req.body;
   try {
     const pool = req.pool;
     // Upsert branding row
     const brand_id = (await pool.query('SELECT id FROM branding')).rows[0].id;
     const result = await pool.query(
-      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6, logo_path = $7, icon_path = $8, box_border_color = $9, box_shadow_color = $10, box_bg_color = $11, timezone = $12 WHERE id = $13 RETURNING *',
-      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', logo_path || '', icon_path || '', box_border_color || '', box_shadow_color || '', box_bg_color || '', timezone || '', brand_id]
+      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6, box_border_color = $7, box_shadow_color = $8, box_bg_color = $9, timezone = $10 WHERE id = $11 RETURNING *',
+      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', box_border_color || '', box_shadow_color || '', box_bg_color || '', timezone || '', brand_id]
     );
     res.json(result.rows[0]);
   } catch (err) {

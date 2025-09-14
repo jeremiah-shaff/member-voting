@@ -22,6 +22,7 @@ export default function BrandingPage() {
           box_border_color: res.box_border_color || '',
           box_shadow_color: res.box_shadow_color || '',
           box_bg_color: res.box_bg_color || '',
+          timezone: res.timezone || '',
           fqdn: res.fqdn || ''
         });
       }
