@@ -104,10 +104,10 @@ export default function EditBallotPage({ branding }) {
           <textarea name="description" placeholder="Describe the purpose or context of this ballot" value={ballot.description} onChange={handleChange} style={{width:'100%'}} />
         </label>
         <label>Voting Start Time<br />
-          <input name="start_time" type="datetime-local" value={ballot.start_time?.slice(0,16)} onChange={handleChange} style={{width:'100%'}} />
+          <input name="start_time" type="datetime-local" value={ballot.start_time ? ballot.start_time.replace(' ', 'T').slice(0,16) : ''} onChange={handleChange} style={{width:'100%'}} />
         </label>
         <label>Voting End Time<br />
-          <input name="end_time" type="datetime-local" value={ballot.end_time?.slice(0,16)} onChange={handleChange} style={{width:'100%'}} />
+          <input name="end_time" type="datetime-local" value={ballot.end_time ? ballot.end_time.replace(' ', 'T').slice(0,16) : ''} onChange={handleChange} style={{width:'100%'}} />
         </label>
         <label>Quorum<br />
           <input name="quorum" type="number" placeholder="Minimum number of votes required" value={ballot.quorum} onChange={handleChange} style={{width:'100%'}} />
