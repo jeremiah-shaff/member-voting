@@ -39,7 +39,7 @@ export default function BallotDetailPage({ branding }) {
   if (ballot.end_time) {
     const timezone = branding?.timezone || 'UTC';
     const now = DateTime.now().setZone(timezone);
-    const end = DateTime(ballot.end_time);
+    const end = ballot.end_time;
     expired = end <= now;
   }
 
