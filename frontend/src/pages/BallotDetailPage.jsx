@@ -34,13 +34,20 @@ export default function BallotDetailPage({ branding }) {
 
   if (!ballot) return <div>Loading...</div>;
 
-  // Ballot expired logic
+  // Ballot expired and not-yet-open logic
   let expired = false;
-  if (ballot.end_time) {
+  let notYetOpen = false;
+  if (ballot.end_time || ballot.start_time) {
     const timezone = branding?.timezone || 'UTC';
     const now = DateTime.now().setZone(timezone);
-    const end = ballot.end_time;
-    expired = end <= now;
+    if (ballot.end_time) {
+      const end = ballot.end_time;
+      expired = end <= now;
+    }
+    if (ballot.start_time) {
+      const start = ballot.start_time;
+      notYetOpen = now < start;
+    }
   }
 
   return (
@@ -55,7 +62,7 @@ export default function BallotDetailPage({ branding }) {
           <div key={m.id} style={{marginBottom: '16px'}}>
             <label><strong>{m.measure_text}</strong></label><br />
             {m.measure_description && <div style={{fontStyle:'italic', color:'#555'}}>{m.measure_description}</div>}
-            <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))} disabled={ballot.has_voted || expired}>
+            <select onChange={e => setVotes(v => ({ ...v, [m.id]: e.target.value }))} disabled={ballot.has_voted || expired || notYetOpen}>
               <option value="">Select</option>
               <option value="yes">Yes</option>
               <option value="no">No</option>
@@ -65,13 +72,16 @@ export default function BallotDetailPage({ branding }) {
         ))}
         <button
           type="submit"
-          disabled={ballot.has_voted || expired}
+          disabled={ballot.has_voted || expired || notYetOpen}
           style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}
-          title={expired ? 'This ballot is expired and cannot be voted on.' : ballot.has_voted ? 'You have already voted.' : ''}
+          title={expired ? 'This ballot is expired and cannot be voted on.' : notYetOpen ? 'Voting has not started yet.' : ballot.has_voted ? 'You have already voted.' : ''}
         >Submit Vote</button>
       </form>
       {expired && (
         <div style={{color:'red', fontWeight:'bold', marginTop:'1em'}}>This ballot is expired and cannot be voted on.</div>
+      )}
+      {notYetOpen && (
+        <div style={{color:'orange', fontWeight:'bold', marginTop:'1em'}}>Voting has not started yet for this ballot.</div>
       )}
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}
