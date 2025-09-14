@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { apiRequest } from '../api.jsx';
+import { DateTime } from 'luxon';
 
 export default function BallotDetailPage({ branding }) {
   const { id } = useParams();
@@ -36,8 +37,9 @@ export default function BallotDetailPage({ branding }) {
   // Ballot expired logic
   let expired = false;
   if (ballot.end_time) {
-    const now = new Date();
-    const end = new Date(ballot.end_time);
+    const timezone = branding?.timezone || 'UTC';
+    const now = DateTime.now().setZone(timezone);
+    const end = DateTime.fromISO(ballot.end_time, { zone: timezone });
     expired = end <= now;
   }
 
