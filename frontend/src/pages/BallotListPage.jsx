@@ -17,7 +17,7 @@ export default function BallotListPage({ branding }) {
           const now = DateTime.now().setZone(timezone);
           filtered = res.filter(b => {
             if (!b.end_time) return true;
-            const end = DateTime(b.end_time);
+            const end = b.end_time;
             return end > now;
           });
         }
@@ -37,7 +37,7 @@ export default function BallotListPage({ branding }) {
           if (isAdmin && b.end_time) {
             const timezone = branding?.timezone || 'UTC';
             const now = DateTime.now().setZone(timezone);
-            const end = DateTime(b.end_time);
+            const end = b.end_time;
             expired = end <= now;
           }
           return (
