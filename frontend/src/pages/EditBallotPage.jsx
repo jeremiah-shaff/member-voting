@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api.jsx';
+import { DateTime } from 'luxon';
 
 export default function EditBallotPage({ branding }) {
   const { id } = useParams();
@@ -104,10 +105,10 @@ export default function EditBallotPage({ branding }) {
           <textarea name="description" placeholder="Describe the purpose or context of this ballot" value={ballot.description} onChange={handleChange} style={{width:'100%'}} />
         </label>
         <label>Voting Start Time<br />
-          <input name="start_time" type="datetime-local" value={ballot.start_time ? ballot.start_time.replace(' ', 'T').slice(0,16) : ''} onChange={handleChange} style={{width:'100%'}} />
+          <input name="start_time" type="datetime-local" value={ballot.start_time ? DateTime.fromISO(ballot.start_time, { zone: branding?.timezone || 'UTC' }).toFormat("yyyy-MM-dd'T'HH:mm") : ''} onChange={handleChange} style={{width:'100%'}} />
         </label>
         <label>Voting End Time<br />
-          <input name="end_time" type="datetime-local" value={ballot.end_time ? ballot.end_time.replace(' ', 'T').slice(0,16) : ''} onChange={handleChange} style={{width:'100%'}} />
+          <input name="end_time" type="datetime-local" value={ballot.end_time ? DateTime.fromISO(ballot.end_time, { zone: branding?.timezone || 'UTC' }).toFormat("yyyy-MM-dd'T'HH:mm") : ''} onChange={handleChange} style={{width:'100%'}} />
         </label>
         <label>Quorum<br />
           <input name="quorum" type="number" placeholder="Minimum number of votes required" value={ballot.quorum} onChange={handleChange} style={{width:'100%'}} />
