@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../api.jsx';
+import { DateTime } from 'luxon';
 
 export default function BallotListPage({ branding }) {
   const [ballots, setBallots] = useState([]);
@@ -12,10 +13,11 @@ export default function BallotListPage({ branding }) {
       if (Array.isArray(res)) {
         let filtered = res;
         if (!isAdmin) {
-          const now = new Date();
+          const timezone = branding?.timezone || 'UTC';
+          const now = DateTime.now().setZone(timezone);
           filtered = res.filter(b => {
             if (!b.end_time) return true;
-            const end = new Date(b.end_time);
+            const end = DateTime.fromISO(b.end_time, { zone: timezone });
             return end > now;
           });
         }
@@ -33,8 +35,9 @@ export default function BallotListPage({ branding }) {
           // Ballot expired logic for admin
           let expired = false;
           if (isAdmin && b.end_time) {
-            const now = new Date();
-            const end = new Date(b.end_time);
+            const timezone = branding?.timezone || 'UTC';
+            const now = DateTime.now().setZone(timezone);
+            const end = DateTime.fromISO(b.end_time, { zone: timezone });
             expired = end <= now;
           }
           return (
