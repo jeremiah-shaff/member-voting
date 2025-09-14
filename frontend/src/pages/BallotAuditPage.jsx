@@ -61,10 +61,10 @@ export default function BallotAuditPage({ branding }) {
 
   return (
     <div style={{ maxWidth: 600, margin: '2em auto', background: branding?.box_bg_color || branding?.bg_color || '#fff', borderRadius: 12, boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`, border: `2px solid ${branding?.box_border_color || '#eee'}`, padding: '2em', color: branding?.text_color || '#222' }}>
-      <h2 style={{ color: branding?.nav_text_color || branding?.text_color || '#222' }}>Ballot Audit</h2>
+      <h2 style={{ color: branding?.text_color || '#222' }}>Ballot Audit</h2>
       {ballotDetails && (
         <div style={{marginBottom:'1em', padding:'1em', background:branding?.box_bg_color || '#f8f8f8', borderRadius:'8px', border:`1px solid ${branding?.box_border_color || '#ccc'}`}}>
-          <h3 style={{margin:'0 0 0.5em 0', color:branding?.nav_text_color || branding?.text_color || '#222'}}>{ballotDetails.title}</h3>
+          <h3 style={{margin:'0 0 0.5em 0', color:branding?.text_color || '#222'}}>{ballotDetails.title}</h3>
           <div style={{marginBottom:'0.5em', color:branding?.text_color || '#555'}}>{ballotDetails.description}</div>
           <div style={{fontSize:'0.95em', color:branding?.text_color || '#555'}}>
             <strong>Start Time:</strong> {ballotDetails.start_time}<br />
