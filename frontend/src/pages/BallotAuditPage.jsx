@@ -70,6 +70,9 @@ export default function BallotAuditPage({ branding }) {
         )}
       </ul>
       <h3 style={{ marginTop: '2em', color: branding?.nav_text_color || branding?.text_color || '#222' }}>Paper Ballots Recorded</h3>
+      <p style={{ fontStyle: 'italic', color: branding?.text_color || '#555', marginBottom: '1em' }}>
+        The following votes were recorded as <span style={{ fontWeight: 'bold' }}>paper ballots</span> and entered by an administrator. These are not linked to individual members.
+      </p>
       {paperVotes.length === 0 ? (
         <p>No paper ballots have been recorded for this ballot.</p>
       ) : (
@@ -79,7 +82,9 @@ export default function BallotAuditPage({ branding }) {
               <strong>{measure.measure_text}</strong>
               <ul style={{ listStyle: 'none', paddingLeft: '1em' }}>
                 {measure.votes.map((v, i) => (
-                  <li key={i} style={{ color: branding?.text_color || '#555' }}>{v.value}: {v.count}</li>
+                  <li key={i} style={{ color: branding?.text_color || '#555' }}>
+                    {v.value}: {v.count} <span style={{ fontStyle: 'italic', color: '#b8860b' }}>(paper ballot)</span>
+                  </li>
                 ))}
               </ul>
             </li>

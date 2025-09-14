@@ -70,7 +70,7 @@ export default function AdminDashboard({ branding }) {
                   textAlign: 'center',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
                 }}>Audit</Link>
-                <Link to={`/editballot/${b.id}`} style={{
+                <Link to={`/admin/edit-ballot/${b.id}`} style={{
                   background: branding?.button_color || '#007bff',
                   color: branding?.text_color || '#fff',
                   border: 'none',
