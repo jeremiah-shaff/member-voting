@@ -60,7 +60,7 @@ router.use((req, res, next) => {
 // Get branding settings
 router.get('/branding', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM branding LIMIT 1');
+    const result = await pool.query('SELECT * FROM branding LIMIT 1 ORDER BY id DESC');
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch branding' });
