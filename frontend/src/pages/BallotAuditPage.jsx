@@ -30,10 +30,16 @@ export default function BallotAuditPage({ branding }) {
         if (res && res.results) {
           // Extract paper votes per measure
           const paperSummary = res.results.map(measure => {
-            const paperVotes = measure.votes.filter(v => v.value === 'yes' || v.value === 'no' || v.value === 'abstain');
+            // Only include votes where v.is_paper === true
+            const paperVotes = measure.votes
+              .filter(v => v.is_paper === true)
+              .reduce((acc, v) => {
+                acc[v.value] = (acc[v.value] || 0) + v.count;
+                return acc;
+              }, {});
             return {
               measure_text: measure.measure_text,
-              votes: paperVotes
+              votes: Object.entries(paperVotes).map(([value, count]) => ({ value, count }))
             };
           });
           setPaperVotes(paperSummary);

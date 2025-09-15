@@ -62,7 +62,10 @@ export default function BallotDetailPage({ branding }) {
               <option value="">Select</option>
               <option value="yes">Yes</option>
               <option value="no">No</option>
-              <option value="abstain">Abstain</option>
+              {/* Only show Abstain if allowed in branding */}
+              {branding?.allow_abstain !== false && (
+                <option value="Abstain">Abstain</option>
+              )}
             </select>
           </div>
         ))}

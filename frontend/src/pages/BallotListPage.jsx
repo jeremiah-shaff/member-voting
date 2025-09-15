@@ -46,7 +46,17 @@ export default function BallotListPage({ branding }) {
           }
           return (
             <li key={b.id}>
-              <a href={`/ballots/${b.id}`}>{b.title}</a>
+               <a
+                href={b.is_visible === false ? undefined : `/ballots/${b.id}`}
+                style={{
+                  pointerEvents: b.is_visible === false ? 'none' : 'auto',
+                  opacity: b.is_visible === false ? 0.5 : 1,
+                  cursor: b.is_visible === false ? 'not-allowed' : 'pointer',
+                  textDecoration: b.is_visible === false ? 'line-through' : 'underline'
+                }}
+                aria-disabled={b.is_visible === false}
+                title={b.is_visible === false ? 'You do not have permission to view this ballot.' : ''}
+              >{b.title}</a>
               <span style={{marginLeft:'12px', fontStyle:'italic', color:'#666'}}>
                 {Array.isArray(b.committee_names) && b.committee_names.filter(n => n).length > 0
                   ? `Assigned to: ${b.committee_names.filter(n => n).join(', ')}`
