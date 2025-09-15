@@ -9,6 +9,8 @@ export default function MemberManagementPage({ branding }) {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ username: '', password: '', is_admin: false });
   const [registrationEnabled, setRegistrationEnabledState] = useState(true);
+  const [branding, setBranding] = useState({});
+  const [allowAbstain, setAllowAbstain] = useState(true);
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('token');
@@ -21,6 +23,13 @@ export default function MemberManagementPage({ branding }) {
 
   useEffect(() => {
     getRegistrationEnabled().then(setRegistrationEnabledState);
+  }, []);
+
+  useEffect(() => {
+    apiRequest('/branding', 'GET').then(res => {
+      setBranding(res);
+      setAllowAbstain(res.allow_abstain !== false);
+    });
   }, []);
 
   const handleAdd = async e => {
@@ -79,6 +88,12 @@ export default function MemberManagementPage({ branding }) {
     setRegistrationEnabledState(newVal);
   };
 
+  const handleToggleAbstain = async () => {
+    const updated = { ...branding, allow_abstain: !allowAbstain };
+    await apiRequest('/branding', 'PUT', updated, localStorage.getItem('token'));
+    setAllowAbstain(!allowAbstain);
+  };
+
   return (
     <div>
       <h2>Member Management</h2>
@@ -104,6 +119,17 @@ export default function MemberManagementPage({ branding }) {
     Enable new user registration
   </label>
 </div>
+<div style={{marginBottom:'2em', padding:'1em', background:branding?.box_bg_color || '#f8faff', borderRadius:'8px', border:`1px solid ${branding?.box_border_color || '#ccc'}`}}>
+    <label>
+      <input
+        type="checkbox"
+        checked={allowAbstain}
+        onChange={handleToggleAbstain}
+        style={{marginRight:'8px'}}
+      />
+      Enable "Abstain" voting option for members
+    </label>
+  </div>
       <h4>Members</h4>
       <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
         <thead>

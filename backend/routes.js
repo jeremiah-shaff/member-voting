@@ -60,24 +60,32 @@ router.use((req, res, next) => {
 // Get branding settings
 router.get('/branding', async (req, res) => {
   try {
-    const pool = req.pool;
-    const result = await pool.query('SELECT * FROM branding ORDER BY id DESC LIMIT 1');
-    res.json(result.rows[0] || {});
+    const result = await pool.query('SELECT * FROM branding LIMIT 1');
+    res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get branding' });
+    res.status(500).json({ error: 'Failed to fetch branding' });
   }
 });
 
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
-  const { bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, box_border_color, box_shadow_color, box_bg_color, timezone } = req.body;
   try {
-    const pool = req.pool;
-    // Upsert branding row
-    const brand_id = (await pool.query('SELECT id FROM branding')).rows[0].id;
+    const {
+      bg_color, nav_color, nav_text_color, text_color, button_color, fqdn,
+      box_border_color, box_shadow_color, box_bg_color, timezone, allow_abstain
+    } = req.body;
+    const brand_id = req.body.id || 1;
     const result = await pool.query(
-      'UPDATE branding SET bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4, button_color = $5, fqdn = $6, box_border_color = $7, box_shadow_color = $8, box_bg_color = $9, timezone = $10 WHERE id = $11 RETURNING *',
-      [bg_color || '', nav_color || '', nav_text_color || '', text_color || '', button_color || '', fqdn || '', box_border_color || '', box_shadow_color || '', box_bg_color || '', timezone || '', brand_id]
+      `UPDATE branding SET
+        bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4,
+        button_color = $5, fqdn = $6, box_border_color = $7, box_shadow_color = $8,
+        box_bg_color = $9, timezone = $10, allow_abstain = $11
+        WHERE id = $12 RETURNING *`,
+      [
+        bg_color || '', nav_color || '', nav_text_color || '', text_color || '',
+        button_color || '', fqdn || '', box_border_color || '', box_shadow_color || '',
+        box_bg_color || '', timezone || '', typeof allow_abstain === 'boolean' ? allow_abstain : true, brand_id
+      ]
     );
     res.json(result.rows[0]);
   } catch (err) {

@@ -83,10 +83,11 @@ CREATE TABLE branding (
     box_border_color VARCHAR(32),
     box_shadow_color VARCHAR(32),
     box_bg_color VARCHAR(32),
-    timezone VARCHAR(64)
+    timezone VARCHAR(64),
+    allow_abstain BOOLEAN DEFAULT TRUE
 );
 
-INSERT INTO branding (bg_color, nav_color, nav_text_color, text_color, button_color, fqdn) VALUES ('#545454', '#b3adad', '#ffffff', '#ffffff', '#1e4166', 'localhost');
+INSERT INTO branding (bg_color, nav_color, nav_text_color, text_color, button_color, fqdn, box_bg_color, box_border_color, box_shadow_color, timezone, allow_abstain) VALUES ('#545454', '#b3adad', '#ffffff', '#ffffff', '#1e4166', 'localhost', '#0e496e', '#000000', '#ffffff', 'America/New_York', TRUE);
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,

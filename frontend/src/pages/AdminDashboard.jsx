@@ -81,7 +81,10 @@ export default function AdminDashboard({ branding }) {
                   minWidth: '70px',
                   textAlign: 'center',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-                }}>Edit</Link>
+                }} 
+                aria-disabled={b.is_visible === false}
+                title={b.is_visible === false ? 'You do not have permission to edit this ballot.' : ''}
+                >Edit</Link>
                 <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
               </div>
             </li>
