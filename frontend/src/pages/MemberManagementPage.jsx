@@ -111,11 +111,18 @@ export default function MemberManagementPage({ branding }) {
   boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
 }}>
   <label style={{ fontWeight: 'bold' }}>
-    <input type="checkbox" checked={registrationEnabled} onChange={handleToggle} />
+    <input type="checkbox" checked={registrationEnabled} onChange={handleToggle} style={{marginRight:'8px'}}/>
     Enable new user registration
   </label>
 </div>
-<div style={{marginBottom:'2em', padding:'1em', background:branding?.box_bg_color || '#f8faff', borderRadius:'8px', border:`1px solid ${branding?.box_border_color || '#ccc'}`}}>
+<div style={{
+  margin: '1em 0',
+  padding: '1em',
+  border: `1px solid ${branding?.box_border_color || '#ccc'}`,
+  borderRadius: '8px',
+  background: branding?.box_bg_color || '#f9f9f9',
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+}}>
     <label>
       <input
         type="checkbox"
