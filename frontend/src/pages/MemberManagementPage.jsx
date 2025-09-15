@@ -9,7 +9,7 @@ export default function MemberManagementPage({ branding }) {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ username: '', password: '', is_admin: false });
   const [registrationEnabled, setRegistrationEnabledState] = useState(true);
-  const [allowAbstain, setAllowAbstain] = useState(true);
+  const [allowAbstain, setAllowAbstain] = useState(branding?.allow_abstain !== false);
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('token');
@@ -25,8 +25,10 @@ export default function MemberManagementPage({ branding }) {
   }, []);
 
   useEffect(() => {
+    if (branding) {
       setAllowAbstain(branding.allow_abstain !== false);
-  }, []);
+    }
+  }, [branding]);
 
   const handleAdd = async e => {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function MemberManagementPage({ branding }) {
   };
 
   const handleToggleAbstain = async () => {
-    const updated = { ...branding, allow_abstain: !allowAbstain };
+    const updated = { ...(branding || {}), allow_abstain: !allowAbstain };
     await apiRequest('/branding', 'PUT', updated, localStorage.getItem('token'));
     setAllowAbstain(!allowAbstain);
   };
@@ -123,16 +125,16 @@ export default function MemberManagementPage({ branding }) {
   background: branding?.box_bg_color || '#f9f9f9',
   boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
 }}>
-    <label>
-      <input
-        type="checkbox"
-        checked={allowAbstain}
-        onChange={handleToggleAbstain}
-        style={{marginRight:'8px'}}
-      />
-      Enable "Abstain" voting option for members
-    </label>
-  </div>
+        <label>
+          <input
+            type="checkbox"
+            checked={allowAbstain}
+            onChange={handleToggleAbstain}
+            style={{marginRight:'8px'}}
+          />
+          Enable "Abstain" voting option for members
+        </label>
+      </div>
       <h4>Members</h4>
       <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
         <thead>
