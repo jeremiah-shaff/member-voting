@@ -70,21 +70,39 @@ export default function AdminDashboard({ branding }) {
                   textAlign: 'center',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
                 }}>Audit</Link>
-                <Link to={`/admin/edit-ballot/${b.id}`} style={{
-                  background: branding?.button_color || '#007bff',
-                  color: branding?.text_color || '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '4px 12px',
-                  textDecoration: 'none',
-                  fontWeight: 'bold',
-                  minWidth: '70px',
-                  textAlign: 'center',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-                }} 
-                aria-disabled={b.is_visible === false}
-                title={b.is_visible === false ? 'You do not have permission to edit this ballot.' : ''}
-                >Edit</Link>
+                {b.is_visible === false ? (
+                  <span
+                    aria-disabled="true"
+                    title="You do not have permission to edit this ballot."
+                    style={{
+                      background: (branding?.button_color || '#007bff'),
+                      color: branding?.text_color || '#fff',
+                      borderRadius: '4px',
+                      padding: '4px 12px',
+                      fontWeight: 'bold',
+                      minWidth: '70px',
+                      textAlign: 'center',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                      opacity: 0.45,
+                      cursor: 'not-allowed',
+                      userSelect: 'none',
+                      pointerEvents: 'none'
+                    }}
+                  >Edit</span>
+                ) : (
+                  <Link to={`/admin/edit-ballot/${b.id}`} style={{
+                    background: branding?.button_color || '#007bff',
+                    color: branding?.text_color || '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '4px 12px',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    minWidth: '70px',
+                    textAlign: 'center',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+                  }}>Edit</Link>
+                )}
                 <button onClick={() => handleDeleteBallot(b.id)} style={{background: 'red', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginLeft:'8px'}}>Delete</button>
               </div>
             </li>
