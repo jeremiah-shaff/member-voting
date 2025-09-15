@@ -60,8 +60,9 @@ router.use((req, res, next) => {
 // Get branding settings
 router.get('/branding', async (req, res) => {
   try {
+    const pool = req.pool;
     const result = await pool.query('SELECT * FROM branding LIMIT 1');
-    res.json(result.rows[0]);
+    res.json(result.rows[0] || {});
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch branding' });
   }
@@ -70,6 +71,7 @@ router.get('/branding', async (req, res) => {
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    const pool = req.pool;
     const {
       bg_color, nav_color, nav_text_color, text_color, button_color, fqdn,
       box_border_color, box_shadow_color, box_bg_color, timezone, allow_abstain
