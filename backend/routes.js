@@ -68,6 +68,15 @@ router.get('/branding', async (req, res) => {
   }
 });
 
+// Helper: validate FQDN to avoid unsafe nginx config content
+function isValidFqdn(host) {
+  if (typeof host !== 'string') return false;
+  const h = host.trim().toLowerCase();
+  if (!h || h.length > 253) return false;
+  // labels 1-63 chars, alnum+dash, no leading/trailing dash, dot-separated
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(h);
+}
+
 // Admin: update branding settings (colors, fqdn)
 router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -77,6 +86,12 @@ router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
       box_border_color, box_shadow_color, box_bg_color, timezone, allow_abstain
     } = req.body;
     const brand_id = req.body.id || 1;
+
+    const fqdnNormalized = typeof fqdn === 'string' ? fqdn.toLowerCase().trim() : '';
+    if (fqdnNormalized && !isValidFqdn(fqdnNormalized)) {
+      return res.status(400).json({ error: 'Invalid FQDN' });
+    }
+
     const result = await pool.query(
       `UPDATE branding SET
         bg_color = $1, nav_color = $2, nav_text_color = $3, text_color = $4,
@@ -85,7 +100,7 @@ router.put('/branding', authenticateToken, requireAdmin, async (req, res) => {
         WHERE id = $12 RETURNING *`,
       [
         bg_color || '', nav_color || '', nav_text_color || '', text_color || '',
-        button_color || '', fqdn || '', box_border_color || '', box_shadow_color || '',
+        button_color || '', fqdnNormalized || '', box_border_color || '', box_shadow_color || '',
         box_bg_color || '', timezone || '', typeof allow_abstain === 'boolean' ? allow_abstain : true, brand_id
       ]
     );
@@ -173,8 +188,9 @@ router.delete('/committees/:id', authenticateToken, requireAdmin, async (req, re
 
 // Admin: request ACME certificate for FQDN
 router.post('/request-certificate', authenticateToken, requireAdmin, async (req, res) => {
-  const fqdn = req.body.fqdn;
+  const fqdn = String(req.body.fqdn || '').toLowerCase().trim();
   if (!fqdn) return res.status(400).json({ error: 'FQDN required' });
+  if (!isValidFqdn(fqdn)) return res.status(400).json({ error: 'Invalid FQDN' });
   try {
     await getCertificate(fqdn);
 
@@ -231,7 +247,10 @@ router.post('/rebuild-nginx-config', async (req, res, next) => {
     if (!branding || !branding.fqdn) {
       return res.status(400).json({ error: 'FQDN not set in branding' });
     }
-    const fqdn = branding.fqdn;
+    const fqdn = String(branding.fqdn).toLowerCase().trim();
+    if (!isValidFqdn(fqdn)) {
+      return res.status(400).json({ error: 'Invalid FQDN in branding' });
+    }
     const nginxConfPath = '/etc/nginx/sites-available/member-voting';
   const appDir = process.env.APP_DIR || '/opt/member-voting';
   const certDir = process.env.CERT_DIR || path.join(appDir, 'backend/certs');
@@ -545,9 +564,11 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
   }
   try {
     const pool = req.pool;
-    // Get branding timezone
-    const brandingResult = await pool.query('SELECT timezone FROM branding ORDER BY id DESC LIMIT 1');
+    // Get branding settings
+    const brandingResult = await pool.query('SELECT timezone, allow_abstain FROM branding ORDER BY id DESC LIMIT 1');
     const timezone = brandingResult.rows[0]?.timezone || 'UTC';
+    const allowAbstain = brandingResult.rows[0]?.allow_abstain !== false;
+
     // Check ballot timing
     const ballotResult = await pool.query('SELECT start_time, end_time FROM ballots WHERE id = $1', [ballotId]);
     if (ballotResult.rows.length === 0) return res.status(404).json({ error: 'Ballot not found' });
@@ -556,16 +577,58 @@ router.post('/ballots/:id/vote', authenticateToken, async (req, res) => {
     const end = DateTime.fromISO(ballotResult.rows[0].end_time, { zone: timezone });
     if (now < start) return res.status(403).json({ error: 'Voting has not started yet for this ballot' });
     if (now >= end) return res.status(403).json({ error: 'Voting is not open for this ballot' });
+
+    // Authorization: ensure member is allowed for restricted ballots
+    const commRes = await pool.query('SELECT committee_id FROM ballot_committees WHERE ballot_id = $1', [ballotId]);
+    if (commRes.rows.length > 0) {
+      const memberComms = await pool.query('SELECT committee_id FROM member_committees WHERE member_id = $1', [req.user.id]);
+      const memberCommitteeIds = memberComms.rows.map(r => r.committee_id);
+      const allowed = commRes.rows.some(r => memberCommitteeIds.includes(r.committee_id));
+      if (!allowed) return res.status(403).json({ error: 'Not authorized for this ballot' });
+    }
+
+    // Validate measures belong to this ballot
+    const measuresRes = await pool.query('SELECT id FROM ballot_measures WHERE ballot_id = $1', [ballotId]);
+    const validMeasureIds = new Set(measuresRes.rows.map(r => r.id));
+
+    const allowedValues = allowAbstain ? new Set(['yes', 'no', 'abstain']) : new Set(['yes', 'no']);
+    const seenMeasures = new Set();
+
+    // Validate payload
+    for (const v of votes) {
+      const mid = Number(v.measure_id);
+      if (!validMeasureIds.has(mid)) {
+        return res.status(400).json({ error: 'Invalid measure_id for this ballot' });
+      }
+      if (seenMeasures.has(mid)) {
+        return res.status(400).json({ error: 'Duplicate vote for the same measure' });
+      }
+      seenMeasures.add(mid);
+      const val = String(v.vote_value || '').toLowerCase();
+      if (!allowedValues.has(val)) {
+        return res.status(400).json({ error: allowAbstain ? 'Invalid vote_value (allowed: yes, no, abstain)' : 'Invalid vote_value (allowed: yes, no)' });
+      }
+    }
+
     // Prevent duplicate votes per measure per member
     for (const v of votes) {
-      const exists = await pool.query('SELECT id FROM votes WHERE ballot_id = $1 AND measure_id = $2 AND member_id = $3 AND vote_type = $4', [ballotId, v.measure_id, req.user.id, 'electronic']);
+      const exists = await pool.query(
+        'SELECT id FROM votes WHERE ballot_id = $1 AND measure_id = $2 AND member_id = $3 AND vote_type = $4',
+        [ballotId, v.measure_id, req.user.id, 'electronic']
+      );
       if (exists.rows.length > 0) return res.status(409).json({ error: 'Already voted on one or more measures' });
     }
-    // Insert votes (electronic)
-    const votePromises = votes.map(v =>
-      pool.query("INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 1, $5)", [ballotId, v.measure_id, req.user.id, v.vote_value, 'electronic'])
-    );
+
+    // Insert votes (electronic) with normalized values
+    const votePromises = votes.map(v => {
+      const val = String(v.vote_value || '').toLowerCase();
+      return pool.query(
+        'INSERT INTO votes (ballot_id, measure_id, member_id, vote_value, vote_count, vote_type) VALUES ($1, $2, $3, $4, 1, $5)',
+        [ballotId, v.measure_id, req.user.id, val, 'electronic']
+      );
+    });
     await Promise.all(votePromises);
+
     res.status(201).json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Voting failed' });
@@ -648,10 +711,10 @@ router.put('/members/:id', authenticateToken, requireAdmin, async (req, res) => 
   try {
     const pool = req.pool;
     let query = 'UPDATE members SET ';
-    username = username.toLowerCase(); // Make username case insensitive
+    if (typeof username === 'string') username = username.toLowerCase(); // Make username case insensitive
     let params = [];
     let updates = [];
-    if (username) { updates.push('username = $' + (params.length+1)); params.push(username); }
+    if (typeof username === 'string' && username.length) { updates.push('username = $' + (params.length+1)); params.push(username); }
     if (typeof is_admin === 'boolean') { updates.push('is_admin = $' + (params.length+1)); params.push(is_admin); }
     if (password) {
       const hash = await bcrypt.hash(password, 10);
