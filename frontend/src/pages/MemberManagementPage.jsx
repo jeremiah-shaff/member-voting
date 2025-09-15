@@ -9,7 +9,6 @@ export default function MemberManagementPage({ branding }) {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ username: '', password: '', is_admin: false });
   const [registrationEnabled, setRegistrationEnabledState] = useState(true);
-  const [branding, setBranding] = useState({});
   const [allowAbstain, setAllowAbstain] = useState(true);
 
   const fetchMembers = async () => {
@@ -26,10 +25,7 @@ export default function MemberManagementPage({ branding }) {
   }, []);
 
   useEffect(() => {
-    apiRequest('/branding', 'GET').then(res => {
-      setBranding(res);
-      setAllowAbstain(res.allow_abstain !== false);
-    });
+      setAllowAbstain(branding.allow_abstain !== false);
   }, []);
 
   const handleAdd = async e => {
