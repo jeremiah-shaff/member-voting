@@ -113,14 +113,24 @@ Member Voting is a secure, timezone-aware web application for managing ballots, 
 - Request/renew HTTPS certificates and rebuild Nginx config from the Branding page
 - All settings are stored in the database and applied dynamically
 
-## Email Invites for Registration
+## Email Invites for Registration & SMTP/OAuth
 
 The app supports sending unique, expiring registration links that allow sign-ups even when global registration is disabled.
 
-1. Configure SMTP via environment variables (on the server):
-  - `SMTP_URL` OR the following individual settings:
-    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (true/false), `SMTP_USER`, `SMTP_PASS`
-  - Optional: `FROM_EMAIL` (default `no-reply@member-voting`)
+1. Configure email delivery
+   - In the Admin UI → Branding → SMTP Settings:
+     - Option A: Basic SMTP (URL or host/port/TLS/username/password)
+     - Option B: OAuth (Exchange Online)
+       - Toggle "Use OAuth (Exchange Online)" and supply:
+         - Tenant ID, Client ID, Client Secret (stored securely, masked in UI)
+         - OAuth User (the mailbox email to send from)
+         - Optional: Scope (default `https://outlook.office365.com/.default`), Authority (default `https://login.microsoftonline.com`)
+       - Click "Verify OAuth Token" to ensure MSAL token acquisition is working
+       - Use "Send Test Email" to confirm mail delivery
+   - Server env fallback (if DB settings not provided):
+     - `SMTP_URL` OR the following individual settings:
+       - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (true/false), `SMTP_USER`, `SMTP_PASS`
+     - Optional: `FROM_EMAIL` (default `no-reply@member-voting`)
 
 2. In the Admin UI (Members page):
   - Create invites with an optional email, count, and expiration window
@@ -130,6 +140,17 @@ The app supports sending unique, expiring registration links that allow sign-ups
   - When a user visits `/register?invite=TOKEN`, the app validates the token
   - If registration is globally disabled, a valid invite still allows registration
   - If the invite has an email, the username field is prefilled and locked to that email
+
+### Exchange Online (OAuth) setup notes
+
+To use OAuth with Exchange Online SMTP:
+
+- Create an Azure AD App Registration and enable client credentials (Client Secret).
+- Grant application permissions that back the `https://outlook.office365.com/.default` resource (requires admin consent).
+- Ensure SMTP AUTH is enabled in your tenant and for the mailbox if applicable.
+- The mailbox specified in "OAuth User" must be accessible to the app under your org’s security model.
+
+Troubleshooting: Use the "Verify OAuth Token" button to get immediate feedback. The UI will surface MSAL error details (code/suberror/correlation ID) to help pinpoint configuration issues.
 
 ## Support
 For issues or feature requests, open an issue on GitHub or contact the maintainer.

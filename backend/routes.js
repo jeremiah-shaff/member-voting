@@ -54,13 +54,61 @@ router.get('/certificate-status', (req, res) => {
 // Helper: read SMTP settings from DB settings table and build transporter
 async function createSmtpTransport(pool) {
   // Read settings keys
-  const keys = ['smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass'];
+  const keys = [
+    'smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass',
+    // OAuth keys
+    'oauth_enabled', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_user', 'oauth_scope', 'oauth_authority'
+  ];
   let settingsMap = {};
   try {
     const res = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
     for (const row of res.rows) settingsMap[row.key] = row.value;
   } catch (e) {
     // fallback to env if settings table inaccessible
+  }
+
+  // OAuth (Exchange Online) path
+  const oauthEnabled = String(settingsMap.oauth_enabled || '').toLowerCase() === 'true';
+  if (oauthEnabled) {
+    const tenantId = (settingsMap.oauth_tenant_id || '').trim();
+    const clientId = (settingsMap.oauth_client_id || '').trim();
+    const clientSecret = settingsMap.oauth_client_secret || '';
+    const user = (settingsMap.oauth_user || '').trim();
+    const scope = (settingsMap.oauth_scope || 'https://outlook.office365.com/.default').trim();
+    const authorityBase = (settingsMap.oauth_authority || 'https://login.microsoftonline.com').trim();
+    if (!tenantId || !clientId || !clientSecret || !user) {
+      throw new Error('OAuth is enabled but required fields are missing (tenant id, client id, client secret, user).');
+    }
+    // Host/port defaults for Exchange Online if not specified
+    const host = (settingsMap.smtp_host || 'smtp.office365.com').trim();
+    const port = Number(settingsMap.smtp_port || '587');
+    const secure = String(settingsMap.smtp_secure || '').toLowerCase() === 'true';
+
+    // Acquire token using MSAL (client credential flow)
+    const { ConfidentialClientApplication } = require('@azure/msal-node');
+    const cca = new ConfidentialClientApplication({
+      auth: {
+        clientId,
+        authority: `${authorityBase}/${tenantId}`,
+        clientSecret,
+      },
+    });
+    const tokenResponse = await cca.acquireTokenByClientCredential({ scopes: [scope] });
+    if (!tokenResponse || !tokenResponse.accessToken) {
+      throw new Error('Failed to acquire OAuth access token for SMTP.');
+    }
+    const accessToken = tokenResponse.accessToken;
+    return nodemailer.createTransport({
+      host,
+      port: isNaN(port) ? 587 : port,
+      secure,
+      requireTLS: !secure,
+      auth: {
+        type: 'OAuth2',
+        user,
+        accessToken,
+      },
+    });
   }
 
   // Priority: smtp_url -> host config -> env -> JSON transport
@@ -500,7 +548,14 @@ router.post('/invites/:id/send', authenticateToken, requireAdmin, async (req, re
     res.json({ success: true, messageId: sendRes.messageId || undefined, preview: sendRes.message || undefined, url });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to send invite' });
+    const payload = { error: 'Failed to send invite' };
+    if (err && typeof err === 'object') {
+      if (err.message) payload.details = err.message;
+      if (err.errorCode || err.code) payload.code = err.errorCode || err.code;
+      if (err.subError || err.suberror) payload.suberror = err.subError || err.suberror;
+      if (err.correlationId) payload.correlationId = err.correlationId;
+    }
+    res.status(500).json(payload);
   }
 });
 
@@ -525,14 +580,25 @@ router.get('/invites/validate/:token', async (req, res) => {
 router.get('/smtp-settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const pool = req.pool;
-    const keys = ['smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'from_email'];
+    const keys = [
+      'smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'from_email',
+      'oauth_enabled', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_user', 'oauth_scope', 'oauth_authority'
+    ];
     const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
-    const out = { smtp_url: '', smtp_host: '', smtp_port: '', smtp_secure: false, smtp_user: '', smtp_pass: '', has_password: false, from_email: '' };
+    const out = {
+      smtp_url: '', smtp_host: '', smtp_port: '', smtp_secure: false, smtp_user: '', smtp_pass: '', has_password: false, from_email: '',
+      oauth_enabled: false, oauth_tenant_id: '', oauth_client_id: '', oauth_client_secret: '', oauth_user: '', oauth_scope: 'https://outlook.office365.com/.default', oauth_authority: 'https://login.microsoftonline.com',
+      has_client_secret: false,
+    };
     for (const row of result.rows) {
       if (row.key === 'smtp_secure') {
         out.smtp_secure = String(row.value).toLowerCase() === 'true';
       } else if (row.key === 'smtp_pass') {
         out.has_password = !!row.value;
+      } else if (row.key === 'oauth_enabled') {
+        out.oauth_enabled = String(row.value).toLowerCase() === 'true';
+      } else if (row.key === 'oauth_client_secret') {
+        out.has_client_secret = !!row.value;
       } else if (row.key in out) {
         out[row.key] = row.value || '';
       } else if (row.key === 'from_email') {
@@ -541,6 +607,7 @@ router.get('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
     }
     // Do not return actual password; indicate if present
     out.smtp_pass = '';
+    out.oauth_client_secret = '';
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: 'Failed to load SMTP settings' });
@@ -551,7 +618,10 @@ router.get('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
 router.put('/smtp-settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const pool = req.pool;
-    const { smtp_url, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, from_email, clear_password } = req.body || {};
+    const {
+      smtp_url, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, from_email, clear_password,
+      oauth_enabled, oauth_tenant_id, oauth_client_id, oauth_client_secret, oauth_user, oauth_scope, oauth_authority, clear_client_secret
+    } = req.body || {};
     // Helper to upsert key/value
     async function upsert(key, value) {
       await pool.query(
@@ -571,6 +641,19 @@ router.put('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
       await upsert('smtp_pass', '');
     } else if (typeof smtp_pass === 'string' && smtp_pass.length > 0) {
       await upsert('smtp_pass', smtp_pass);
+    }
+
+    // OAuth fields
+    if (oauth_enabled !== undefined) await upsert('oauth_enabled', String(!!oauth_enabled));
+    if (typeof oauth_tenant_id === 'string') await upsert('oauth_tenant_id', oauth_tenant_id.trim());
+    if (typeof oauth_client_id === 'string') await upsert('oauth_client_id', oauth_client_id.trim());
+    if (typeof oauth_user === 'string') await upsert('oauth_user', oauth_user.trim());
+    if (typeof oauth_scope === 'string') await upsert('oauth_scope', oauth_scope.trim());
+    if (typeof oauth_authority === 'string') await upsert('oauth_authority', oauth_authority.trim());
+    if (clear_client_secret === true) {
+      await upsert('oauth_client_secret', '');
+    } else if (typeof oauth_client_secret === 'string' && oauth_client_secret.length > 0) {
+      await upsert('oauth_client_secret', oauth_client_secret);
     }
 
     res.json({ success: true });
@@ -614,7 +697,54 @@ router.post('/smtp-settings/test', authenticateToken, requireAdmin, async (req, 
     res.json({ success: true, messageId: info.messageId || undefined, envelope: info.envelope || undefined, preview: info.message || undefined });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to send test email' });
+    const payload = { error: 'Failed to send test email' };
+    if (err && typeof err === 'object') {
+      if (err.message) payload.details = err.message;
+      if (err.errorCode || err.code) payload.code = err.errorCode || err.code;
+      if (err.subError || err.suberror) payload.suberror = err.subError || err.suberror;
+      if (err.correlationId) payload.correlationId = err.correlationId;
+    }
+    res.status(500).json(payload);
+  }
+});
+
+// Verify OAuth token acquisition (no token returned)
+router.post('/smtp-settings/verify-oauth', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    // Read required OAuth settings
+    const keys = ['oauth_enabled', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_scope', 'oauth_authority'];
+    const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
+    const map = {};
+    for (const row of result.rows) map[row.key] = row.value;
+    if (String(map.oauth_enabled || '').toLowerCase() !== 'true') {
+      return res.status(400).json({ error: 'OAuth is not enabled.' });
+    }
+    const tenantId = (map.oauth_tenant_id || '').trim();
+    const clientId = (map.oauth_client_id || '').trim();
+    const clientSecret = map.oauth_client_secret || '';
+    const authorityBase = (map.oauth_authority || 'https://login.microsoftonline.com').trim();
+    const scope = (map.oauth_scope || 'https://outlook.office365.com/.default').trim();
+    if (!tenantId || !clientId || !clientSecret) {
+      return res.status(400).json({ error: 'Missing OAuth settings (tenant id, client id, or client secret).' });
+    }
+    const { ConfidentialClientApplication } = require('@azure/msal-node');
+    const cca = new ConfidentialClientApplication({ auth: { clientId, authority: `${authorityBase}/${tenantId}`, clientSecret } });
+    const tokenResponse = await cca.acquireTokenByClientCredential({ scopes: [scope] });
+    if (!tokenResponse || !tokenResponse.accessToken) {
+      return res.status(500).json({ error: 'Token acquisition failed.' });
+    }
+    res.json({ success: true, expiresOn: tokenResponse.expiresOn?.toISOString?.() || tokenResponse.expiresOn || null, tokenType: tokenResponse.tokenType || 'Bearer' });
+  } catch (err) {
+    console.error(err);
+    const payload = { error: 'OAuth verification failed' };
+    if (err && typeof err === 'object') {
+      if (err.message) payload.details = err.message;
+      if (err.errorCode || err.code) payload.code = err.errorCode || err.code;
+      if (err.subError || err.suberror) payload.suberror = err.subError || err.suberror;
+      if (err.correlationId) payload.correlationId = err.correlationId;
+    }
+    res.status(500).json(payload);
   }
 });
 
