@@ -8,6 +8,18 @@ export default function BrandingPage() {
   const [iconFile, setIconFile] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // SMTP settings state
+  const [smtp, setSmtp] = useState({
+    smtp_url: '',
+    smtp_host: '',
+    smtp_port: '',
+    smtp_secure: false,
+    smtp_user: '',
+    smtp_pass: '',
+    has_password: false,
+    from_email: ''
+  });
+  const [smtpTestTo, setSmtpTestTo] = useState('');
 
   useEffect(() => {
     apiRequest('/branding', 'GET').then(res => {
@@ -25,6 +37,13 @@ export default function BrandingPage() {
           timezone: res.timezone || '',
           fqdn: res.fqdn || ''
         });
+      }
+    });
+    // Load SMTP settings
+    const token = localStorage.getItem('token');
+    apiRequest('/smtp-settings', 'GET', undefined, token).then(res => {
+      if (res && !res.error) {
+        setSmtp(s => ({ ...s, ...res }));
       }
     });
   }, []);
@@ -187,6 +206,76 @@ export default function BrandingPage() {
   {branding.icon_path && <img src={`${branding.icon_path}`} alt="Icon" style={{maxHeight:'40px', marginBottom:'8px'}} />}
         <input type="file" accept="image/*" onChange={e => setIconFile(e.target.files[0])} />
   <button onClick={() => handleUpload('icon', iconFile)} style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop: '8px'}}>Upload Icon</button>
+      </div>
+      <div style={{marginBottom:'2em'}}>
+        <h3>SMTP Settings</h3>
+        <p style={{fontSize:'0.9em'}}>Configure how emails are sent for invite links.</p>
+        <div style={{
+          marginBottom: '16px',
+          border: `2px solid ${branding?.box_border_color || '#007bff'}`,
+          borderRadius: '12px',
+          boxShadow: `0 2px 8px ${branding?.box_shadow_color || 'rgba(0,0,0,0.07)'}`,
+          padding: '16px',
+          background: branding?.box_bg_color || '#f8faff',
+        }}>
+          <label>SMTP URL <input placeholder="smtp://user:pass@host:port" value={smtp.smtp_url || ''} onChange={e => setSmtp(v => ({ ...v, smtp_url: e.target.value }))} style={{width:'100%'}} /></label><br />
+          <div style={{opacity:0.7, fontSize:'0.85em', margin:'6px 0'}}>Or specify individual fields below (host/port/secure/user/password)</div>
+          <label>Host <input value={smtp.smtp_host || ''} onChange={e => setSmtp(v => ({ ...v, smtp_host: e.target.value }))} /></label>{' '}
+          <label>Port <input type="number" value={smtp.smtp_port || ''} onChange={e => setSmtp(v => ({ ...v, smtp_port: e.target.value }))} style={{width:100}} /></label>{' '}
+          <label><input type="checkbox" checked={!!smtp.smtp_secure} onChange={e => setSmtp(v => ({ ...v, smtp_secure: e.target.checked }))} /> Use TLS (secure)</label><br />
+          <label>Username <input value={smtp.smtp_user || ''} onChange={e => setSmtp(v => ({ ...v, smtp_user: e.target.value }))} /></label><br />
+          <label>Password <input type="password" value={smtp.smtp_pass || ''} placeholder={smtp.has_password ? '•••••• (set)' : ''} onChange={e => setSmtp(v => ({ ...v, smtp_pass: e.target.value }))} /></label>{' '}
+          {smtp.has_password && (
+            <label style={{marginLeft:'8px'}}><input type="checkbox" onChange={e => setSmtp(v => ({ ...v, clear_password: e.target.checked }))} /> Clear saved password</label>
+          )}
+          <br />
+          <label>From Email <input value={smtp.from_email || ''} onChange={e => setSmtp(v => ({ ...v, from_email: e.target.value }))} placeholder="no-reply@example.com" /></label>
+          <div style={{marginTop:'8px'}}>
+            <button
+              type="button"
+              style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px'}}
+              onClick={async () => {
+                setError(''); setSuccess('');
+                const token = localStorage.getItem('token');
+                const payload = {
+                  smtp_url: smtp.smtp_url,
+                  smtp_host: smtp.smtp_host,
+                  smtp_port: smtp.smtp_port,
+                  smtp_secure: smtp.smtp_secure,
+                  smtp_user: smtp.smtp_user,
+                  // Only send smtp_pass if field has a value; else keep existing
+                  ...(smtp.smtp_pass ? { smtp_pass: smtp.smtp_pass } : {}),
+                  ...(smtp.clear_password ? { clear_password: true } : {}),
+                  from_email: smtp.from_email,
+                };
+                const res = await apiRequest('/smtp-settings', 'PUT', payload, token);
+                if (res && !res.error) {
+                  setSuccess('SMTP settings saved');
+                  setSmtp(v => ({ ...v, smtp_pass: '', has_password: smtp.clear_password ? false : (v.has_password || !!payload.smtp_pass), clear_password: false }));
+                } else {
+                  setError(res.error || 'Failed to save SMTP settings');
+                }
+              }}
+            >Save SMTP Settings</button>
+            <div style={{marginTop:'10px'}}>
+              <label>Send Test To <input value={smtpTestTo} placeholder="you@example.com" onChange={e => setSmtpTestTo(e.target.value)} /></label>{' '}
+              <button
+                type="button"
+                style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px'}}
+                onClick={async () => {
+                  setError(''); setSuccess('');
+                  const token = localStorage.getItem('token');
+                  const res = await apiRequest('/smtp-settings/test', 'POST', { to: smtpTestTo }, token);
+                  if (res && !res.error) {
+                    setSuccess(`Test email sent${res.messageId ? ` (messageId: ${res.messageId})` : ''}.`);
+                  } else {
+                    setError(res.error || 'Failed to send test email');
+                  }
+                }}
+              >Send Test Email</button>
+            </div>
+          </div>
+        </div>
       </div>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}

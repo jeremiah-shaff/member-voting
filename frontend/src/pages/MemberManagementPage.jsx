@@ -10,6 +10,10 @@ export default function MemberManagementPage({ branding }) {
   const [editForm, setEditForm] = useState({ username: '', password: '', is_admin: false });
   const [registrationEnabled, setRegistrationEnabledState] = useState(true);
   const [allowAbstain, setAllowAbstain] = useState(branding?.allow_abstain !== false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteCount, setInviteCount] = useState(1);
+  const [inviteHours, setInviteHours] = useState(72);
+  const [invites, setInvites] = useState([]);
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('token');
@@ -19,6 +23,12 @@ export default function MemberManagementPage({ branding }) {
   };
 
   useEffect(() => { fetchMembers(); }, []);
+  const fetchInvites = async () => {
+    const token = localStorage.getItem('token');
+    const res = await apiRequest('/invites', 'GET', null, token);
+    if (Array.isArray(res)) setInvites(res);
+  };
+  useEffect(() => { fetchInvites(); }, []);
 
   useEffect(() => {
     getRegistrationEnabled().then(setRegistrationEnabledState);
@@ -92,6 +102,33 @@ export default function MemberManagementPage({ branding }) {
     setAllowAbstain(!allowAbstain);
   };
 
+  const handleCreateInvites = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const res = await apiRequest('/invites', 'POST', { email: inviteEmail, count: Number(inviteCount), expires_in_hours: Number(inviteHours) }, token);
+    if (Array.isArray(res)) {
+      setSuccess(`Created ${res.length} invite(s).`);
+      setError('');
+      setInviteEmail('');
+      fetchInvites();
+    } else {
+      setError(res.error || 'Failed to create invites');
+      setSuccess('');
+    }
+  };
+
+  const handleSendInvite = async (id) => {
+    const token = localStorage.getItem('token');
+    const res = await apiRequest(`/invites/${id}/send`, 'POST', {}, token);
+    if (res.success) {
+      setSuccess('Invite email sent.');
+      setError('');
+    } else {
+      setError(res.error || 'Failed to send invite');
+      setSuccess('');
+    }
+  };
+
   return (
     <div>
       <h2>Member Management</h2>
@@ -134,6 +171,51 @@ export default function MemberManagementPage({ branding }) {
           />
           Enable "Abstain" voting option for members
         </label>
+      </div>
+      <div style={{
+  margin: '1em 0',
+  padding: '1em',
+  border: `1px solid ${branding?.box_border_color || '#ccc'}`,
+  borderRadius: '8px',
+  background: branding?.box_bg_color || '#f9f9f9',
+  boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+}}>
+        <h4>Registration Invites</h4>
+        <form onSubmit={handleCreateInvites} style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
+          <input type="email" placeholder="Invitee Email (optional)" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+          <input type="number" min="1" max="100" placeholder="Count" value={inviteCount} onChange={e => setInviteCount(e.target.value)} style={{width:'90px'}} />
+          <input type="number" min="1" max="8760" placeholder="Expires in hours" value={inviteHours} onChange={e => setInviteHours(e.target.value)} style={{width:'140px'}} />
+          <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Create</button>
+        </form>
+        <div style={{marginTop:'12px', maxHeight:'220px', overflowY:'auto'}}>
+          <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Token</th>
+                <th>Expires</th>
+                <th>Used</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invites.map(inv => (
+                <tr key={inv.id}>
+                  <td>{inv.id}</td>
+                  <td>{inv.email}</td>
+                  <td style={{fontFamily:'monospace'}}>{inv.token}</td>
+                  <td>{new Date(inv.expires_at).toLocaleString()}</td>
+                  <td>{inv.used_at ? new Date(inv.used_at).toLocaleString() : ''}</td>
+                  <td style={{display:'flex', gap:'8px'}}>
+                    <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/register?invite=${inv.token}`)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Copy Link</button>
+                    <button onClick={() => handleSendInvite(inv.id)} disabled={!inv.email} title={inv.email ? '' : 'Set email to send'} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Send Email</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       <h4>Members</h4>
       <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
