@@ -98,3 +98,16 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT INTO settings (key, value)
 SELECT 'registrationEnabled', 'true'
 WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'registrationEnabled');
+
+-- Registration invites for gated signups
+CREATE TABLE IF NOT EXISTS registration_invites (
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used_at TIMESTAMP,
+    created_by INTEGER REFERENCES members(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_registration_invites_token ON registration_invites(token);

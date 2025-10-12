@@ -45,6 +45,7 @@ Member Voting is a secure, timezone-aware web application for managing ballots, 
   - Add, edit, delete members
   - Grant/revoke admin privileges
   - Case-insensitive usernames
+  - Invite-only registration with expiring links (works even when registration is disabled)
 
 - **Branding & UI:**
   - Set background, navigation, text, and button colors
@@ -111,6 +112,24 @@ Member Voting is a secure, timezone-aware web application for managing ballots, 
 - Update colors, logo, icon, FQDN, and timezone from the Branding page
 - Request/renew HTTPS certificates and rebuild Nginx config from the Branding page
 - All settings are stored in the database and applied dynamically
+
+## Email Invites for Registration
+
+The app supports sending unique, expiring registration links that allow sign-ups even when global registration is disabled.
+
+1. Configure SMTP via environment variables (on the server):
+  - `SMTP_URL` OR the following individual settings:
+    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (true/false), `SMTP_USER`, `SMTP_PASS`
+  - Optional: `FROM_EMAIL` (default `no-reply@member-voting`)
+
+2. In the Admin UI (Members page):
+  - Create invites with an optional email, count, and expiration window
+  - Copy the invite link or click "Send Email" to email it to the invitee
+
+3. Registration Page Behavior:
+  - When a user visits `/register?invite=TOKEN`, the app validates the token
+  - If registration is globally disabled, a valid invite still allows registration
+  - If the invite has an email, the username field is prefilled and locked to that email
 
 ## Support
 For issues or feature requests, open an issue on GitHub or contact the maintainer.

@@ -10,6 +10,8 @@ const CERT_DIR = path.join(__dirname, 'certs');
 const CERT_FILE = path.join(CERT_DIR, 'cert.pem');
 const { X509Certificate } = require('crypto');
 const { setRegistrationEnabled, getRegistrationEnabled } = require('./db');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { DateTime } = require('luxon');
 
 // Auth routes
@@ -48,6 +50,54 @@ router.get('/certificate-status', (req, res) => {
     res.status(500).json({ error: 'Failed to check certificate status' });
   }
 });
+
+// Helper: read SMTP settings from DB settings table and build transporter
+async function createSmtpTransport(pool) {
+  // Read settings keys
+  const keys = ['smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass'];
+  let settingsMap = {};
+  try {
+    const res = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
+    for (const row of res.rows) settingsMap[row.key] = row.value;
+  } catch (e) {
+    // fallback to env if settings table inaccessible
+  }
+
+  // Priority: smtp_url -> host config -> env -> JSON transport
+  try {
+    if (settingsMap.smtp_url && settingsMap.smtp_url.trim()) {
+      return nodemailer.createTransport(settingsMap.smtp_url.trim());
+    }
+    if (settingsMap.smtp_host && settingsMap.smtp_host.trim()) {
+      const port = Number(settingsMap.smtp_port || '587');
+      const secure = String(settingsMap.smtp_secure || '').toLowerCase() === 'true';
+      const user = settingsMap.smtp_user || undefined;
+      const pass = settingsMap.smtp_pass || undefined;
+      return nodemailer.createTransport({
+        host: settingsMap.smtp_host.trim(),
+        port: isNaN(port) ? 587 : port,
+        secure,
+        auth: user ? { user, pass } : undefined,
+      });
+    }
+  } catch (e) {
+    // fall through to env/JSON
+  }
+  // Env fallbacks
+  if (process.env.SMTP_URL) {
+    return nodemailer.createTransport(process.env.SMTP_URL);
+  }
+  if (process.env.SMTP_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: !!process.env.SMTP_SECURE,
+      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+    });
+  }
+  // Dev fallback
+  return nodemailer.createTransport({ jsonTransport: true });
+}
 // Request logging middleware
 router.use((req, res, next) => {
   const logEntry = `${new Date().toISOString()} ${req.method} ${req.originalUrl} IP:${req.ip}\n`;
@@ -305,10 +355,34 @@ router.post('/registration-enabled', authenticateToken, requireAdmin, async (req
 
 // Register member or admin
 router.post('/auth/register', async (req, res) => {
+  let { username, password, is_admin, invite_token } = req.body;
+  let inviteBypass = false;
   if (!(await getRegistrationEnabled())) {
-    return res.status(403).json({ error: 'Registration is currently disabled.' });
+    if (!invite_token) {
+      return res.status(403).json({ error: 'Registration is currently disabled.' });
+    }
+    try {
+      const pool = req.pool;
+      const now = new Date();
+      const invRes = await pool.query(
+        `SELECT * FROM registration_invites WHERE token = $1 AND used_at IS NULL AND expires_at > $2`,
+        [invite_token, now]
+      );
+      if (invRes.rows.length === 0) {
+        return res.status(403).json({ error: 'Invalid or expired invite link.' });
+      }
+      inviteBypass = true;
+      const invite = invRes.rows[0];
+      if (invite.email && invite.email.includes('@')) {
+        if (username && username.toLowerCase() !== String(invite.email).toLowerCase()) {
+          return res.status(400).json({ error: 'Username must match invited email.' });
+        }
+        username = invite.email;
+      }
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to validate invite.' });
+    }
   }
-  let { username, password, is_admin } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   username = username.toLowerCase(); // Make username case insensitive
   try {
@@ -318,6 +392,9 @@ router.post('/auth/register', async (req, res) => {
       'INSERT INTO members (username, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING id, username, is_admin',
       [username, hash, is_admin || false]
     );
+    if (inviteBypass && invite_token) {
+      await pool.query('UPDATE registration_invites SET used_at = $1 WHERE token = $2', [new Date(), invite_token]);
+    }
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -350,6 +427,196 @@ router.post('/auth/login', async (req, res) => {
 
 
 // Ballot routes
+
+// ===== Registration Invites =====
+// Create invite(s)
+router.post('/invites', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const { email, expires_in_hours = 72, count = 1 } = req.body;
+    const invites = [];
+    const exp = new Date(Date.now() + Math.max(1, Math.min(24 * 365, expires_in_hours)) * 60 * 60 * 1000);
+    for (let i = 0; i < Math.max(1, Math.min(100, count)); i++) {
+      const token = require('crypto').randomBytes(24).toString('hex');
+      const result = await pool.query(
+        'INSERT INTO registration_invites (email, token, expires_at, created_by) VALUES ($1, $2, $3, $4) RETURNING *',
+        [email || '', token, exp, req.user.id]
+      );
+      invites.push(result.rows[0]);
+    }
+    res.status(201).json(invites);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create invites' });
+  }
+});
+
+// List invites
+router.get('/invites', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const result = await pool.query('SELECT * FROM registration_invites ORDER BY id DESC LIMIT 500');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list invites' });
+  }
+});
+
+// Send invite via email
+router.post('/invites/:id/send', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const id = req.params.id;
+    const result = await pool.query('SELECT * FROM registration_invites WHERE id = $1', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Invite not found' });
+    const invite = result.rows[0];
+    if (!invite.email || !invite.email.includes('@')) {
+      return res.status(400).json({ error: 'Invite has no valid email' });
+    }
+    // Build registration URL
+    const brandingRes = await req.pool.query('SELECT fqdn FROM branding ORDER BY id DESC LIMIT 1');
+    const fqdn = brandingRes.rows[0]?.fqdn || 'localhost';
+    const proto = (process.env.NODE_ENV === 'production') ? 'https' : 'http';
+    const port = process.env.FRONTEND_PORT || (proto === 'http' ? ':5173' : '');
+    const url = `${proto}://${fqdn}${port}/register?invite=${invite.token}`;
+    // Configure transporter (DB settings preferred, then env, else JSON)
+    const transporter = await createSmtpTransport(pool);
+
+    // From email preference: settings.from_email -> env FROM_EMAIL -> default
+    let fromEmail = process.env.FROM_EMAIL || 'no-reply@member-voting';
+    try {
+      const fromRes = await pool.query(`SELECT value FROM settings WHERE key = 'from_email'`);
+      if (fromRes.rows[0]?.value) fromEmail = fromRes.rows[0].value;
+    } catch (e) {}
+
+    const sendRes = await transporter.sendMail({
+      from: fromEmail,
+      to: invite.email,
+      subject: 'Your registration link',
+      text: `You have been invited to register. Use this link: ${url}\nThis link expires at ${new Date(invite.expires_at).toLocaleString()}.`,
+      html: `<p>You have been invited to register.</p><p><a href="${url}">Click here to register</a></p><p>This link expires at <b>${new Date(invite.expires_at).toLocaleString()}</b>.</p>`,
+    });
+
+    res.json({ success: true, messageId: sendRes.messageId || undefined, preview: sendRes.message || undefined, url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send invite' });
+  }
+});
+
+// Validate invite token (for frontend precheck)
+router.get('/invites/validate/:token', async (req, res) => {
+  try {
+    const pool = req.pool;
+    const token = req.params.token;
+    const now = new Date();
+    const result = await pool.query('SELECT email, expires_at, used_at FROM registration_invites WHERE token = $1 AND expires_at > $2', [token, now]);
+    if (result.rows.length === 0) return res.status(404).json({ valid: false });
+    const inv = result.rows[0];
+    if (inv.used_at) return res.json({ valid: false, reason: 'used' });
+    res.json({ valid: true, email: inv.email, expires_at: inv.expires_at });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to validate invite' });
+  }
+});
+
+// ===== SMTP Settings (Admin) =====
+// Get SMTP settings (mask password)
+router.get('/smtp-settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const keys = ['smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'from_email'];
+    const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
+    const out = { smtp_url: '', smtp_host: '', smtp_port: '', smtp_secure: false, smtp_user: '', smtp_pass: '', has_password: false, from_email: '' };
+    for (const row of result.rows) {
+      if (row.key === 'smtp_secure') {
+        out.smtp_secure = String(row.value).toLowerCase() === 'true';
+      } else if (row.key === 'smtp_pass') {
+        out.has_password = !!row.value;
+      } else if (row.key in out) {
+        out[row.key] = row.value || '';
+      } else if (row.key === 'from_email') {
+        out.from_email = row.value || '';
+      }
+    }
+    // Do not return actual password; indicate if present
+    out.smtp_pass = '';
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load SMTP settings' });
+  }
+});
+
+// Update SMTP settings
+router.put('/smtp-settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const { smtp_url, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, from_email, clear_password } = req.body || {};
+    // Helper to upsert key/value
+    async function upsert(key, value) {
+      await pool.query(
+        `INSERT INTO settings(key, value) VALUES($1, $2)
+         ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value`,
+        [key, value == null ? '' : String(value)]
+      );
+    }
+    if (typeof smtp_url === 'string') await upsert('smtp_url', smtp_url.trim());
+    if (typeof smtp_host === 'string') await upsert('smtp_host', smtp_host.trim());
+    if (smtp_port !== undefined) await upsert('smtp_port', String(smtp_port).trim());
+    if (smtp_secure !== undefined) await upsert('smtp_secure', String(!!smtp_secure));
+    if (typeof smtp_user === 'string') await upsert('smtp_user', smtp_user.trim());
+    if (typeof from_email === 'string') await upsert('from_email', from_email.trim());
+
+    if (clear_password === true) {
+      await upsert('smtp_pass', '');
+    } else if (typeof smtp_pass === 'string' && smtp_pass.length > 0) {
+      await upsert('smtp_pass', smtp_pass);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update SMTP settings' });
+  }
+});
+
+// Send a test email using current SMTP settings
+router.post('/smtp-settings/test', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const { to } = req.body || {};
+    // Resolve recipient: request body "to" -> current user username if it looks like an email
+    let recipient = String(to || '').trim();
+    if (!recipient) {
+      const maybeEmail = String(req.user?.username || '').trim();
+      if (maybeEmail.includes('@')) recipient = maybeEmail;
+    }
+    if (!recipient || !recipient.includes('@')) {
+      return res.status(400).json({ error: 'Provide a valid test recipient email in the request body as { to }.' });
+    }
+
+    const transporter = await createSmtpTransport(pool);
+    // From email preference: settings.from_email -> env FROM_EMAIL -> default
+    let fromEmail = process.env.FROM_EMAIL || 'no-reply@member-voting';
+    try {
+      const fromRes = await pool.query(`SELECT value FROM settings WHERE key = 'from_email'`);
+      if (fromRes.rows[0]?.value) fromEmail = fromRes.rows[0].value;
+    } catch (e) {}
+
+    const now = new Date();
+    const info = await transporter.sendMail({
+      from: fromEmail,
+      to: recipient,
+      subject: 'SMTP Test Email',
+      text: `This is a test email from Member Voting. Sent at ${now.toISOString()}.`,
+      html: `<p>This is a <b>test email</b> from Member Voting.</p><p>Sent at ${now.toISOString()}.</p>`,
+    });
+    res.json({ success: true, messageId: info.messageId || undefined, envelope: info.envelope || undefined, preview: info.message || undefined });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send test email' });
+  }
+});
 
 // Admin: create ballot
 router.post('/ballots', authenticateToken, requireAdmin, async (req, res) => {
