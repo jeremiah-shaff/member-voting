@@ -76,6 +76,12 @@ export default function BrandingPage() {
         setSmtp(s => ({ ...s, ...res }));
       }
     });
+    // Load platform settings
+    apiRequest('/platform-settings', 'GET', undefined, token).then(res => {
+      if (res && !res.error) {
+        setPlatform(ps => ({ ...ps, ...res }));
+      }
+    });
   }, []);
 
   const handleUpdate = async e => {
@@ -116,6 +122,7 @@ export default function BrandingPage() {
   return (
     <div>
       <h2>Branding Settings</h2>
+      <PlatformSection branding={branding} />
   <form onSubmit={handleUpdate} style={{marginBottom:'2em'}}>
   <label>Background Color <input type="color" value={form.bg_color} onChange={e => setForm(f => ({ ...f, bg_color: e.target.value }))} /></label><br />
   <label>Navigation Bar Color <input type="color" value={form.nav_color} onChange={e => setForm(f => ({ ...f, nav_color: e.target.value }))} /></label><br />
@@ -441,6 +448,45 @@ export default function BrandingPage() {
       </div>
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}
+    </div>
+  );
+}
+
+function PlatformSection({ branding }) {
+  const [platform, setPlatform] = React.useState({ organization_name: '', platform_name: 'Member Voting' });
+  const [status, setStatus] = React.useState({ error: '', success: '' });
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    apiRequest('/platform-settings', 'GET', undefined, token).then(res => {
+      if (res && !res.error) setPlatform(p => ({ ...p, ...res }));
+    });
+  }, []);
+  return (
+    <div style={{
+      margin: '1em 0',
+      padding: '1em',
+      border: `1px solid ${branding?.box_border_color || '#ccc'}`,
+      borderRadius: '8px',
+      background: branding?.box_bg_color || '#f9f9f9',
+      boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
+    }}>
+      <h4>Platform & Organization</h4>
+      <div style={{display:'flex', gap:'12px', flexWrap:'wrap', alignItems:'center'}}>
+        <label>Organization Name <input value={platform.organization_name || ''} onChange={e => setPlatform(p => ({ ...p, organization_name: e.target.value }))} placeholder="Your organization" /></label>
+        <label>Platform Name <input value={platform.platform_name || ''} onChange={e => setPlatform(p => ({ ...p, platform_name: e.target.value }))} placeholder="Member Voting" /></label>
+        <button
+          onClick={async () => {
+            setStatus({ error: '', success: '' });
+            const token = localStorage.getItem('token');
+            const res = await apiRequest('/platform-settings', 'PUT', platform, token);
+            if (res && !res.error) setStatus({ success: 'Saved platform settings.', error: '' });
+            else setStatus({ error: res?.error || 'Save failed', success: '' });
+          }}
+          style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}
+        >Save</button>
+      </div>
+      {status.error && <div style={{color:'red', marginTop:'6px'}}>{status.error}</div>}
+      {status.success && <div style={{color:'green', marginTop:'6px'}}>{status.success}</div>}
     </div>
   );
 }

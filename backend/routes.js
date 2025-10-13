@@ -123,6 +123,42 @@ router.get('/branding', async (req, res) => {
   }
 });
 
+// Platform/Organization settings
+router.get('/platform-settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const keys = ['organization_name', 'platform_name'];
+    const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
+    const out = { organization_name: '', platform_name: 'Member Voting' };
+    for (const row of result.rows) {
+      if (row.key in out) out[row.key] = row.value || '';
+    }
+    if (!out.platform_name) out.platform_name = 'Member Voting';
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load platform settings' });
+  }
+});
+
+router.put('/platform-settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const { organization_name, platform_name } = req.body || {};
+    async function upsert(key, value) {
+      await pool.query(
+        `INSERT INTO settings(key, value) VALUES($1, $2)
+         ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value`,
+        [key, value == null ? '' : String(value)]
+      );
+    }
+    if (typeof organization_name === 'string') await upsert('organization_name', organization_name.trim());
+    if (typeof platform_name === 'string') await upsert('platform_name', platform_name.trim() || 'Member Voting');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save platform settings' });
+  }
+});
+
 // Helper: validate FQDN to avoid unsafe nginx config content
 function isValidFqdn(host) {
   if (typeof host !== 'string') return false;
@@ -467,6 +503,96 @@ router.get('/invites', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// Bulk invite via CSV upload
+// Accepts a CSV or plain text file containing emails (one per line or in a column named 'email')
+// Optional form fields: expires_in_hours (default 72), send_immediately (boolean)
+router.post('/invites/bulk-csv', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const pool = req.pool;
+    const expiresInHours = Math.max(1, Math.min(24 * 365, Number(req.body.expires_in_hours || 72)));
+    const sendImmediately = String(req.body.send_immediately || '').toLowerCase() === 'true';
+
+    const raw = fs.readFileSync(req.file.path, 'utf8');
+    // Basic CSV/newline parsing: split by lines, trim, pick emails
+    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const emails = new Set();
+    if (lines.length) {
+      // If first line looks like header with 'email', parse CSV columns
+      const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase());
+      const hasHeaderEmail = header.includes('email');
+      if (hasHeaderEmail) {
+        const idx = header.indexOf('email');
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(/[,;\t]/).map(c => c.trim());
+          const val = cols[idx] || '';
+          if (val.includes('@')) emails.add(val.toLowerCase());
+        }
+      } else {
+        // Treat each line as possibly containing an email; pull first token with '@'
+        for (const l of lines) {
+          const parts = l.split(/[\s,;\t]+/);
+          const hit = parts.find(p => p.includes('@'));
+          if (hit) emails.add(hit.toLowerCase());
+        }
+      }
+    }
+    // Cleanup uploaded file
+    try { fs.unlinkSync(req.file.path); } catch {}
+
+    const list = Array.from(emails);
+    if (list.length === 0) return res.status(400).json({ error: 'No valid emails found in file' });
+
+    const exp = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+    const created = [];
+    for (const email of list.slice(0, 1000)) { // safety cap
+      const token = crypto.randomBytes(24).toString('hex');
+      const result = await pool.query(
+        'INSERT INTO registration_invites (email, token, expires_at, created_by) VALUES ($1, $2, $3, $4) RETURNING *',
+        [email, token, exp, req.user.id]
+      );
+      created.push(result.rows[0]);
+    }
+
+    let sent = 0;
+    // Prepare org/platform for subject
+    let org = '', platform = 'Member Voting';
+    try {
+      const s = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [[ 'organization_name', 'platform_name' ]]);
+      const map = {}; for (const r of s.rows) map[r.key] = r.value;
+      org = (map.organization_name || '').trim();
+      platform = (map.platform_name || platform).trim() || platform;
+    } catch {}
+    const subj = org ? `${org} – ${platform} registration link` : `${platform} registration link`;
+    if (sendImmediately) {
+      // Use branding fqdn to build URL
+      const brandingRes = await pool.query('SELECT fqdn FROM branding ORDER BY id DESC LIMIT 1');
+      const fqdn = brandingRes.rows[0]?.fqdn || 'localhost';
+      const proto = (process.env.NODE_ENV === 'production') ? 'https' : 'http';
+      const port = process.env.FRONTEND_PORT || (proto === 'http' ? ':5173' : '');
+      for (const inv of created) {
+        const url = `${proto}://${fqdn}${port}/register?invite=${inv.token}`;
+        try {
+          await require('./email').sendEmail(pool, {
+            to: inv.email,
+            subject: subj,
+            text: `You have been invited to register${org ? ` with ${org}'s ${platform} platform` : ''}. Use this link: ${url}\nThis link expires at ${new Date(inv.expires_at).toLocaleString()}.`,
+            html: `<p>You have been invited to register${org ? ` with ${org}'s ${platform} platform` : ''}.</p><p><a href="${url}">Click here to register</a></p><p>This link expires at <b>${new Date(inv.expires_at).toLocaleString()}</b>.</p>`,
+          });
+          sent++;
+        } catch (e) {
+          // continue; report partial failures
+        }
+      }
+    }
+
+    res.json({ success: true, created: created.length, sent });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to process CSV invites' });
+  }
+});
+
 // Send invite via email
 router.post('/invites/:id/send', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -484,12 +610,21 @@ router.post('/invites/:id/send', authenticateToken, requireAdmin, async (req, re
     const proto = (process.env.NODE_ENV === 'production') ? 'https' : 'http';
     const port = process.env.FRONTEND_PORT || (proto === 'http' ? ':5173' : '');
     const url = `${proto}://${fqdn}${port}/register?invite=${invite.token}`;
+    // Subject uses organization/platform names
+    let org = '', platform = 'Member Voting';
+    try {
+      const s = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [[ 'organization_name', 'platform_name' ]]);
+      const map = {}; for (const r of s.rows) map[r.key] = r.value;
+      org = (map.organization_name || '').trim();
+      platform = (map.platform_name || platform).trim() || platform;
+    } catch {}
+    const subj = org ? `${org} – ${platform} registration link` : `${platform} registration link`;
     // Unified email send (Graph or SMTP)
     const sendRes = await emailSvc.sendEmail(pool, {
       to: invite.email,
-      subject: 'Your registration link',
-      text: `You have been invited to register. Use this link: ${url}\nThis link expires at ${new Date(invite.expires_at).toLocaleString()}.`,
-      html: `<p>You have been invited to register.</p><p><a href="${url}">Click here to register</a></p><p>This link expires at <b>${new Date(invite.expires_at).toLocaleString()}</b>.</p>`,
+      subject: subj,
+      text: `You have been invited to register${org ? ` with ${org}'s ${platform} platform` : ''}. Use this link: ${url}\nThis link expires at ${new Date(invite.expires_at).toLocaleString()}.`,
+      html: `<p>You have been invited to register${org ? ` with ${org}'s ${platform} platform` : ''}.</p><p><a href="${url}">Click here to register</a></p><p>This link expires at <b>${new Date(invite.expires_at).toLocaleString()}</b>.</p>`,
     });
 
     res.json({ success: true, messageId: sendRes.messageId || undefined, preview: sendRes.message || undefined, url });
