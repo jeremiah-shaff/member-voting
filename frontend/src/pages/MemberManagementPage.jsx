@@ -29,7 +29,24 @@ export default function MemberManagementPage({ branding }) {
   const fetchInvites = async () => {
     const token = localStorage.getItem('token');
     const res = await apiRequest('/invites', 'GET', null, token);
-    if (Array.isArray(res)) setInvites(res);
+    if (Array.isArray(res)) {
+      // Defensive: filter out expired invites (shouldn't be needed if backend is correct)
+      const now = Date.now();
+      setInvites(res.filter(inv => new Date(inv.expires_at) > now));
+    }
+  };
+  const handleDeleteInvite = async (id) => {
+    if (!window.confirm('Delete this invite?')) return;
+    const token = localStorage.getItem('token');
+    const res = await apiRequest(`/invites/${id}`, 'DELETE', null, token);
+    if (res.success) {
+      setSuccess('Invite deleted!');
+      setError('');
+      fetchInvites();
+    } else {
+      setError(res.error || 'Delete failed');
+      setSuccess('');
+    }
   };
   useEffect(() => { fetchInvites(); }, []);
 
@@ -213,6 +230,7 @@ export default function MemberManagementPage({ branding }) {
                   <td style={{display:'flex', gap:'8px'}}>
                     <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/register?invite=${inv.token}`)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Copy Link</button>
                     <button onClick={() => handleSendInvite(inv.id)} disabled={!inv.email} title={inv.email ? '' : 'Set email to send'} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Send Email</button>
+                    <button onClick={() => handleDeleteInvite(inv.id)} style={{background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Delete</button>
                   </td>
                 </tr>
               ))}
