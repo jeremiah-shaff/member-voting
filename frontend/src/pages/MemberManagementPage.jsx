@@ -14,6 +14,9 @@ export default function MemberManagementPage({ branding }) {
   const [inviteCount, setInviteCount] = useState(1);
   const [inviteHours, setInviteHours] = useState(72);
   const [invites, setInvites] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvExpires, setCsvExpires] = useState(72);
+  const [csvSend, setCsvSend] = useState(true);
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('token');
@@ -215,6 +218,46 @@ export default function MemberManagementPage({ branding }) {
               ))}
             </tbody>
           </table>
+        </div>
+        <div style={{marginTop:'16px', paddingTop:'12px', borderTop:'1px dashed #ccc'}}>
+          <h5>Bulk Invites (CSV)</h5>
+          <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
+            <input type="file" accept=".csv,text/csv,text/plain" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
+            <label><input type="number" min="1" max="8760" value={csvExpires} onChange={e => setCsvExpires(e.target.value)} style={{width:'140px'}} /> Expires in hours</label>
+            <label><input type="checkbox" checked={csvSend} onChange={e => setCsvSend(e.target.checked)} /> Send emails immediately</label>
+            <button
+              onClick={async () => {
+                setError(''); setSuccess('');
+                if (!csvFile) { setError('Choose a CSV file first.'); return; }
+                const fd = new FormData();
+                fd.append('file', csvFile);
+                fd.append('expires_in_hours', String(csvExpires));
+                fd.append('send_immediately', String(csvSend));
+                try {
+                  const token = localStorage.getItem('token');
+                  const res = await fetch('/api/invites/bulk-csv', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: fd,
+                  });
+                  const data = await res.json();
+                  if (data && data.success) {
+                    setSuccess(`Created ${data.created} invite(s)${csvSend ? ` and sent ${data.sent}` : ''}.`);
+                    setCsvFile(null);
+                    fetchInvites();
+                  } else {
+                    setError(data?.error || 'Bulk invite failed');
+                  }
+                } catch (e) {
+                  setError('Network error: ' + e.toString());
+                }
+              }}
+              style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}
+            >Upload CSV</button>
+          </div>
+          <div style={{fontSize:'0.85em', opacity:0.8, marginTop:'6px'}}>
+            Accepted formats: a single column of emails (with or without a header named "email"), or a CSV with an "email" column. Max 1000 rows.
+          </div>
         </div>
       </div>
       <h4>Members</h4>
