@@ -113,44 +113,59 @@ Member Voting is a secure, timezone-aware web application for managing ballots, 
 - Request/renew HTTPS certificates and rebuild Nginx config from the Branding page
 - All settings are stored in the database and applied dynamically
 
-## Email Invites for Registration & SMTP/OAuth
+## Email invites and delivery options
 
-The app supports sending unique, expiring registration links that allow sign-ups even when global registration is disabled.
+The app can send unique, expiring registration links (even when global registration is disabled). You can choose between three delivery methods in the Admin UI.
 
-1. Configure email delivery
-   - In the Admin UI → Branding → SMTP Settings:
-     - Option A: Basic SMTP (URL or host/port/TLS/username/password)
-     - Option B: OAuth (Exchange Online)
-       - Toggle "Use OAuth (Exchange Online)" and supply:
-         - Tenant ID, Client ID, Client Secret (stored securely, masked in UI)
-         - OAuth User (the mailbox email to send from)
-         - Optional: Scope (default `https://outlook.office365.com/.default`), Authority (default `https://login.microsoftonline.com`)
-       - Click "Verify OAuth Token" to ensure MSAL token acquisition is working
-       - Use "Send Test Email" to confirm mail delivery
-   - Server env fallback (if DB settings not provided):
-     - `SMTP_URL` OR the following individual settings:
-       - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (true/false), `SMTP_USER`, `SMTP_PASS`
-     - Optional: `FROM_EMAIL` (default `no-reply@member-voting`)
+1) Microsoft Graph (app-only, recommended for service accounts)
+- Admin UI → Branding → Email Settings → enable "Use Microsoft Graph"
+- Fill these fields and Save:
+  - Tenant ID, Client ID, Client Secret (masked when saved)
+  - Send As (user email), Authority (default OK)
+- Click "Verify OAuth Token" to validate Graph credentials
+- Use "Send Test Email" to confirm delivery
 
-2. In the Admin UI (Members page):
-  - Create invites with an optional email, count, and expiration window
-  - Copy the invite link or click "Send Email" to email it to the invitee
+Azure requirements:
+- Azure AD App Registration with Application permission Mail.Send (admin consent)
+- After consent, the app can send mail using the selected "Send As" user
 
-3. Registration Page Behavior:
-  - When a user visits `/register?invite=TOKEN`, the app validates the token
-  - If registration is globally disabled, a valid invite still allows registration
-  - If the invite has an email, the username field is prefilled and locked to that email
+2) SMTP with delegated OAuth (Exchange Online)
+- Admin UI → Branding → Email Settings → enable "Use OAuth (Exchange Online)"
+- Set Mode = Delegated (device code)
+- Fill and Save:
+  - Tenant ID, Client ID, OAuth User (mailbox email)
+  - Scopes (default includes `https://outlook.office365.com/SMTP.Send offline_access openid profile email`)
+  - Authority (default OK)
+- Click "Start Device Code Sign-in" and follow the on-screen instructions to authenticate the mailbox user
+- Click "Verify OAuth Token" to confirm delegated token availability
+- Use "Send Test Email"
 
-### Exchange Online (OAuth) setup notes
+Notes:
+- SMTP with app-only OAuth is not supported by Exchange Online; use delegated mode or Microsoft Graph
+- MSAL token cache is persisted in the `settings` table and refreshed automatically
 
-To use OAuth with Exchange Online SMTP:
+3) SMTP with basic auth
+- Admin UI → Branding → Email Settings (leave OAuth and Graph disabled)
+- Provide SMTP URL, or Host/Port/Secure/Username/Password
+- Save and send a test email
+- Tenant/mailbox must have SMTP AUTH enabled for this to work
 
-- Create an Azure AD App Registration and enable client credentials (Client Secret).
-- Grant application permissions that back the `https://outlook.office365.com/.default` resource (requires admin consent).
-- Ensure SMTP AUTH is enabled in your tenant and for the mailbox if applicable.
-- The mailbox specified in "OAuth User" must be accessible to the app under your org’s security model.
+Server env fallback (if DB settings are not set):
+- `SMTP_URL` OR individual settings: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` (true/false), `SMTP_USER`, `SMTP_PASS`
+- Optional: `FROM_EMAIL` (default `no-reply@member-voting`)
 
-Troubleshooting: Use the "Verify OAuth Token" button to get immediate feedback. The UI will surface MSAL error details (code/suberror/correlation ID) to help pinpoint configuration issues.
+### Sending invites
+- In the Admin UI (Members/Invites), create invite(s) with optional email and expiration
+- Copy the link or click "Send Email" to email it directly
+
+### Registration behavior
+- Visiting `/register?invite=TOKEN` validates the token and permits sign-up even if global registration is disabled
+- If the invite includes an email, the username is pre-filled and locked
+
+### Troubleshooting
+- Use "Verify OAuth Token" for immediate feedback:
+  - Reports if delegated OAuth (SMTP) or Graph (app-only) is configured correctly
+  - Surfaces MSAL error details to help diagnose setup issues
 
 ## Support
 For issues or feature requests, open an issue on GitHub or contact the maintainer.

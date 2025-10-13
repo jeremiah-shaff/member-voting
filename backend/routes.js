@@ -12,6 +12,7 @@ const { X509Certificate } = require('crypto');
 const { setRegistrationEnabled, getRegistrationEnabled } = require('./db');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const emailSvc = require('./email');
 const { DateTime } = require('luxon');
 
 // Auth routes
@@ -51,12 +52,12 @@ router.get('/certificate-status', (req, res) => {
   }
 });
 
-// Helper: read SMTP settings from DB settings table and build transporter
+// Helper: read SMTP settings from DB settings table and build transporter (basic/env only)
 async function createSmtpTransport(pool) {
   // Read settings keys
   const keys = [
     'smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass',
-    // OAuth keys
+    // legacy OAuth keys ignored here; OAuth handled in email service
     'oauth_enabled', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_user', 'oauth_scope', 'oauth_authority'
   ];
   let settingsMap = {};
@@ -65,50 +66,6 @@ async function createSmtpTransport(pool) {
     for (const row of res.rows) settingsMap[row.key] = row.value;
   } catch (e) {
     // fallback to env if settings table inaccessible
-  }
-
-  // OAuth (Exchange Online) path
-  const oauthEnabled = String(settingsMap.oauth_enabled || '').toLowerCase() === 'true';
-  if (oauthEnabled) {
-    const tenantId = (settingsMap.oauth_tenant_id || '').trim();
-    const clientId = (settingsMap.oauth_client_id || '').trim();
-    const clientSecret = settingsMap.oauth_client_secret || '';
-    const user = (settingsMap.oauth_user || '').trim();
-    const scope = (settingsMap.oauth_scope || 'https://outlook.office365.com/.default').trim();
-    const authorityBase = (settingsMap.oauth_authority || 'https://login.microsoftonline.com').trim();
-    if (!tenantId || !clientId || !clientSecret || !user) {
-      throw new Error('OAuth is enabled but required fields are missing (tenant id, client id, client secret, user).');
-    }
-    // Host/port defaults for Exchange Online if not specified
-    const host = (settingsMap.smtp_host || 'smtp.office365.com').trim();
-    const port = Number(settingsMap.smtp_port || '587');
-    const secure = String(settingsMap.smtp_secure || '').toLowerCase() === 'true';
-
-    // Acquire token using MSAL (client credential flow)
-    const { ConfidentialClientApplication } = require('@azure/msal-node');
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId,
-        authority: `${authorityBase}/${tenantId}`,
-        clientSecret,
-      },
-    });
-    const tokenResponse = await cca.acquireTokenByClientCredential({ scopes: [scope] });
-    if (!tokenResponse || !tokenResponse.accessToken) {
-      throw new Error('Failed to acquire OAuth access token for SMTP.');
-    }
-    const accessToken = tokenResponse.accessToken;
-    return nodemailer.createTransport({
-      host,
-      port: isNaN(port) ? 587 : port,
-      secure,
-      requireTLS: !secure,
-      auth: {
-        type: 'OAuth2',
-        user,
-        accessToken,
-      },
-    });
   }
 
   // Priority: smtp_url -> host config -> env -> JSON transport
@@ -527,18 +484,8 @@ router.post('/invites/:id/send', authenticateToken, requireAdmin, async (req, re
     const proto = (process.env.NODE_ENV === 'production') ? 'https' : 'http';
     const port = process.env.FRONTEND_PORT || (proto === 'http' ? ':5173' : '');
     const url = `${proto}://${fqdn}${port}/register?invite=${invite.token}`;
-    // Configure transporter (DB settings preferred, then env, else JSON)
-    const transporter = await createSmtpTransport(pool);
-
-    // From email preference: settings.from_email -> env FROM_EMAIL -> default
-    let fromEmail = process.env.FROM_EMAIL || 'no-reply@member-voting';
-    try {
-      const fromRes = await pool.query(`SELECT value FROM settings WHERE key = 'from_email'`);
-      if (fromRes.rows[0]?.value) fromEmail = fromRes.rows[0].value;
-    } catch (e) {}
-
-    const sendRes = await transporter.sendMail({
-      from: fromEmail,
+    // Unified email send (Graph or SMTP)
+    const sendRes = await emailSvc.sendEmail(pool, {
       to: invite.email,
       subject: 'Your registration link',
       text: `You have been invited to register. Use this link: ${url}\nThis link expires at ${new Date(invite.expires_at).toLocaleString()}.`,
@@ -582,13 +529,16 @@ router.get('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
     const pool = req.pool;
     const keys = [
       'smtp_url', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'from_email',
-      'oauth_enabled', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_user', 'oauth_scope', 'oauth_authority'
+      'oauth_enabled', 'oauth_mode', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_user', 'oauth_scope', 'oauth_authority',
+      'use_graph_email', 'graph_tenant_id', 'graph_client_id', 'graph_client_secret', 'graph_user', 'graph_authority'
     ];
     const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
     const out = {
       smtp_url: '', smtp_host: '', smtp_port: '', smtp_secure: false, smtp_user: '', smtp_pass: '', has_password: false, from_email: '',
-      oauth_enabled: false, oauth_tenant_id: '', oauth_client_id: '', oauth_client_secret: '', oauth_user: '', oauth_scope: 'https://outlook.office365.com/.default', oauth_authority: 'https://login.microsoftonline.com',
+      oauth_enabled: false, oauth_mode: 'delegated', oauth_tenant_id: '', oauth_client_id: '', oauth_client_secret: '', oauth_user: '', oauth_scope: 'https://outlook.office365.com/SMTP.Send offline_access openid profile email', oauth_authority: 'https://login.microsoftonline.com',
       has_client_secret: false,
+      use_graph_email: false, graph_tenant_id: '', graph_client_id: '', graph_client_secret: '', graph_user: '', graph_authority: 'https://login.microsoftonline.com',
+      has_graph_client_secret: false,
     };
     for (const row of result.rows) {
       if (row.key === 'smtp_secure') {
@@ -597,17 +547,24 @@ router.get('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
         out.has_password = !!row.value;
       } else if (row.key === 'oauth_enabled') {
         out.oauth_enabled = String(row.value).toLowerCase() === 'true';
+      } else if (row.key === 'oauth_mode') {
+        out.oauth_mode = (row.value || 'delegated');
       } else if (row.key === 'oauth_client_secret') {
         out.has_client_secret = !!row.value;
       } else if (row.key in out) {
         out[row.key] = row.value || '';
       } else if (row.key === 'from_email') {
         out.from_email = row.value || '';
+      } else if (row.key === 'use_graph_email') {
+        out.use_graph_email = String(row.value).toLowerCase() === 'true';
+      } else if (row.key === 'graph_client_secret') {
+        out.has_graph_client_secret = !!row.value;
       }
     }
     // Do not return actual password; indicate if present
     out.smtp_pass = '';
     out.oauth_client_secret = '';
+    out.graph_client_secret = '';
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: 'Failed to load SMTP settings' });
@@ -620,7 +577,8 @@ router.put('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
     const pool = req.pool;
     const {
       smtp_url, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, from_email, clear_password,
-      oauth_enabled, oauth_tenant_id, oauth_client_id, oauth_client_secret, oauth_user, oauth_scope, oauth_authority, clear_client_secret
+      oauth_enabled, oauth_mode, oauth_tenant_id, oauth_client_id, oauth_client_secret, oauth_user, oauth_scope, oauth_authority, clear_client_secret,
+      use_graph_email, graph_tenant_id, graph_client_id, graph_client_secret, graph_user, graph_authority, clear_graph_client_secret
     } = req.body || {};
     // Helper to upsert key/value
     async function upsert(key, value) {
@@ -645,6 +603,7 @@ router.put('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
 
     // OAuth fields
     if (oauth_enabled !== undefined) await upsert('oauth_enabled', String(!!oauth_enabled));
+    if (typeof oauth_mode === 'string') await upsert('oauth_mode', oauth_mode.trim());
     if (typeof oauth_tenant_id === 'string') await upsert('oauth_tenant_id', oauth_tenant_id.trim());
     if (typeof oauth_client_id === 'string') await upsert('oauth_client_id', oauth_client_id.trim());
     if (typeof oauth_user === 'string') await upsert('oauth_user', oauth_user.trim());
@@ -654,6 +613,18 @@ router.put('/smtp-settings', authenticateToken, requireAdmin, async (req, res) =
       await upsert('oauth_client_secret', '');
     } else if (typeof oauth_client_secret === 'string' && oauth_client_secret.length > 0) {
       await upsert('oauth_client_secret', oauth_client_secret);
+    }
+
+    // Graph fields
+    if (use_graph_email !== undefined) await upsert('use_graph_email', String(!!use_graph_email));
+    if (typeof graph_tenant_id === 'string') await upsert('graph_tenant_id', graph_tenant_id.trim());
+    if (typeof graph_client_id === 'string') await upsert('graph_client_id', graph_client_id.trim());
+    if (typeof graph_user === 'string') await upsert('graph_user', graph_user.trim());
+    if (typeof graph_authority === 'string') await upsert('graph_authority', graph_authority.trim());
+    if (clear_graph_client_secret === true) {
+      await upsert('graph_client_secret', '');
+    } else if (typeof graph_client_secret === 'string' && graph_client_secret.length > 0) {
+      await upsert('graph_client_secret', graph_client_secret);
     }
 
     res.json({ success: true });
@@ -678,23 +649,14 @@ router.post('/smtp-settings/test', authenticateToken, requireAdmin, async (req, 
       return res.status(400).json({ error: 'Provide a valid test recipient email in the request body as { to }.' });
     }
 
-    const transporter = await createSmtpTransport(pool);
-    // From email preference: settings.from_email -> env FROM_EMAIL -> default
-    let fromEmail = process.env.FROM_EMAIL || 'no-reply@member-voting';
-    try {
-      const fromRes = await pool.query(`SELECT value FROM settings WHERE key = 'from_email'`);
-      if (fromRes.rows[0]?.value) fromEmail = fromRes.rows[0].value;
-    } catch (e) {}
-
     const now = new Date();
-    const info = await transporter.sendMail({
-      from: fromEmail,
+    const info = await emailSvc.sendEmail(pool, {
       to: recipient,
       subject: 'SMTP Test Email',
       text: `This is a test email from Member Voting. Sent at ${now.toISOString()}.`,
       html: `<p>This is a <b>test email</b> from Member Voting.</p><p>Sent at ${now.toISOString()}.</p>`,
     });
-    res.json({ success: true, messageId: info.messageId || undefined, envelope: info.envelope || undefined, preview: info.message || undefined });
+    res.json({ success: true, messageId: info.messageId || undefined });
   } catch (err) {
     console.error(err);
     const payload = { error: 'Failed to send test email' };
@@ -712,29 +674,12 @@ router.post('/smtp-settings/test', authenticateToken, requireAdmin, async (req, 
 router.post('/smtp-settings/verify-oauth', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const pool = req.pool;
-    // Read required OAuth settings
-    const keys = ['oauth_enabled', 'oauth_tenant_id', 'oauth_client_id', 'oauth_client_secret', 'oauth_scope', 'oauth_authority'];
-    const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]);
-    const map = {};
-    for (const row of result.rows) map[row.key] = row.value;
-    if (String(map.oauth_enabled || '').toLowerCase() !== 'true') {
-      return res.status(400).json({ error: 'OAuth is not enabled.' });
-    }
-    const tenantId = (map.oauth_tenant_id || '').trim();
-    const clientId = (map.oauth_client_id || '').trim();
-    const clientSecret = map.oauth_client_secret || '';
-    const authorityBase = (map.oauth_authority || 'https://login.microsoftonline.com').trim();
-    const scope = (map.oauth_scope || 'https://outlook.office365.com/.default').trim();
-    if (!tenantId || !clientId || !clientSecret) {
-      return res.status(400).json({ error: 'Missing OAuth settings (tenant id, client id, or client secret).' });
-    }
-    const { ConfidentialClientApplication } = require('@azure/msal-node');
-    const cca = new ConfidentialClientApplication({ auth: { clientId, authority: `${authorityBase}/${tenantId}`, clientSecret } });
-    const tokenResponse = await cca.acquireTokenByClientCredential({ scopes: [scope] });
-    if (!tokenResponse || !tokenResponse.accessToken) {
-      return res.status(500).json({ error: 'Token acquisition failed.' });
-    }
-    res.json({ success: true, expiresOn: tokenResponse.expiresOn?.toISOString?.() || tokenResponse.expiresOn || null, tokenType: tokenResponse.tokenType || 'Bearer' });
+    const { tryDelegatedSmtpSilent, verifyGraphAuth } = require('./email');
+    const del = await tryDelegatedSmtpSilent(pool);
+    if (del.success) return res.json({ success: true, mode: 'delegated', username: del.username });
+    const graph = await verifyGraphAuth(pool);
+    if (graph.success) return res.json({ success: true, mode: 'graph' });
+    return res.status(400).json({ error: 'No valid OAuth path configured', delegatedError: del.error, graphError: graph.error });
   } catch (err) {
     console.error(err);
     const payload = { error: 'OAuth verification failed' };
@@ -745,6 +690,17 @@ router.post('/smtp-settings/verify-oauth', authenticateToken, requireAdmin, asyn
       if (err.correlationId) payload.correlationId = err.correlationId;
     }
     res.status(500).json(payload);
+  }
+});
+
+// Start delegated OAuth device code flow for SMTP
+router.post('/smtp-settings/oauth/device-code', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const result = await emailSvc.startDelegatedDeviceCodeFlow(pool);
+    res.json({ success: true, device: result.device || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to start device code flow' });
   }
 });
 

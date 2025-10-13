@@ -182,9 +182,9 @@ export default function MemberManagementPage({ branding }) {
 }}>
         <h4>Registration Invites</h4>
         <form onSubmit={handleCreateInvites} style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
-          <input type="email" placeholder="Invitee Email (optional)" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
-          <input type="number" min="1" max="100" placeholder="Count" value={inviteCount} onChange={e => setInviteCount(e.target.value)} style={{width:'90px'}} />
-          <input type="number" min="1" max="8760" placeholder="Expires in hours" value={inviteHours} onChange={e => setInviteHours(e.target.value)} style={{width:'140px'}} />
+          <label><input type="email" placeholder="Invitee Email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />Email</label>
+          <label><input type="number" min="1" max="100" placeholder="Count" value={inviteCount} onChange={e => setInviteCount(e.target.value)} style={{width:'90px'}} />Count</label>
+          <label><input type="number" min="1" max="8760" placeholder="Expires in hours" value={inviteHours} onChange={e => setInviteHours(e.target.value)} style={{width:'140px'}} />Expires in hours</label>
           <button type="submit" style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Create</button>
         </form>
         <div style={{marginTop:'12px', maxHeight:'220px', overflowY:'auto'}}>
