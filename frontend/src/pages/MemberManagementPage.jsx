@@ -200,6 +200,50 @@ export default function MemberManagementPage({ branding }) {
   background: branding?.box_bg_color || '#f9f9f9',
   boxShadow: `0 2px 8px ${branding?.box_shadow_color || '#ccc'}`,
 }}>
+
+    <h4>Members</h4>
+    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+      <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Admin</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map(m => (
+            <tr key={m.id}>
+              <td>{m.id}</td>
+              <td>{editId === m.id ? (
+                <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))} />
+              ) : m.username}</td>
+              <td>{editId === m.id ? (
+                <input type="checkbox" checked={editForm.is_admin} onChange={e => setEditForm(f => ({ ...f, is_admin: e.target.checked }))} />
+              ) : (m.is_admin ? 'Yes' : 'No')}</td>
+              <td>{new Date(m.created_at).toLocaleString()}</td>
+              <td>
+                {editId === m.id ? (
+                  <>
+                    <input type="password" placeholder="New password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
+                    <button onClick={handleUpdate} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginRight:'8px'}}>Save</button>
+                    <button onClick={() => setEditId(null)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Cancel</button>
+                  </>
+                ) : (
+                  <div style={{display:'flex', gap:'8px'}}>
+                    <button onClick={() => handleEdit(m)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Edit</button>
+                    <button onClick={() => handleDelete(m.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Delete</button>
+                  </div>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
         <h4>Registration Invites</h4>
         <form onSubmit={handleCreateInvites} style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
           <label><input type="email" placeholder="Invitee Email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />Email</label>
@@ -278,46 +322,7 @@ export default function MemberManagementPage({ branding }) {
           </div>
         </div>
       </div>
-      <h4>Members</h4>
-      <table border="1" cellPadding="6" style={{borderCollapse:'collapse', minWidth:'400px'}}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Username</th>
-            <th>Admin</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {members.map(m => (
-            <tr key={m.id}>
-              <td>{m.id}</td>
-              <td>{editId === m.id ? (
-                <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))} />
-              ) : m.username}</td>
-              <td>{editId === m.id ? (
-                <input type="checkbox" checked={editForm.is_admin} onChange={e => setEditForm(f => ({ ...f, is_admin: e.target.checked }))} />
-              ) : (m.is_admin ? 'Yes' : 'No')}</td>
-              <td>{new Date(m.created_at).toLocaleString()}</td>
-              <td>
-                {editId === m.id ? (
-                  <>
-                    <input type="password" placeholder="New password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
-                    <button onClick={handleUpdate} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px', marginRight:'8px'}}>Save</button>
-                    <button onClick={() => setEditId(null)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Cancel</button>
-                  </>
-                ) : (
-                  <div style={{display:'flex', gap:'8px'}}>
-                    <button onClick={() => handleEdit(m)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Edit</button>
-                    <button onClick={() => handleDelete(m.id)} style={{background: (branding?.button_color || '#007bff'), color: (branding?.text_color || '#fff'), border: 'none', borderRadius: '4px', padding: '4px 12px'}}>Delete</button>
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    
       {error && <div style={{color:'red'}}>{error}</div>}
       {success && <div style={{color:'green'}}>{success}</div>}
     </div>
