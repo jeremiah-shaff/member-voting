@@ -493,13 +493,34 @@ router.post('/invites', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // List invites
+
+// List only non-expired invites
 router.get('/invites', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const pool = req.pool;
-    const result = await pool.query('SELECT * FROM registration_invites ORDER BY id DESC LIMIT 500');
+    const now = new Date();
+    const result = await pool.query(
+      'SELECT * FROM registration_invites WHERE expires_at > $1 ORDER BY id DESC LIMIT 500',
+      [now]
+    );
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list invites' });
+  }
+});
+
+// Delete invite by id
+router.delete('/invites/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = req.pool;
+    const id = req.params.id;
+    const result = await pool.query('DELETE FROM registration_invites WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Invite not found' });
+    }
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete invite' });
   }
 });
 
