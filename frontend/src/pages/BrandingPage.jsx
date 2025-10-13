@@ -20,22 +20,36 @@ export default function BrandingPage() {
     from_email: '',
     // OAuth fields
     oauth_enabled: false,
+    oauth_mode: 'delegated',
     oauth_tenant_id: '',
     oauth_client_id: '',
     oauth_client_secret: '',
     has_client_secret: false,
     oauth_user: '',
-    oauth_scope: 'https://outlook.office365.com/.default',
-    oauth_authority: 'https://login.microsoftonline.com'
+    oauth_scope: 'https://outlook.office365.com/SMTP.Send offline_access openid profile email',
+    oauth_authority: 'https://login.microsoftonline.com',
+    // Graph
+    use_graph_email: false,
+    graph_tenant_id: '',
+    graph_client_id: '',
+    graph_client_secret: '',
+    has_graph_client_secret: false,
+    graph_user: '',
+    graph_authority: 'https://login.microsoftonline.com'
   });
   const [smtpTestTo, setSmtpTestTo] = useState('');
   const isOAuthConfigured = !!smtp.oauth_enabled;
   const isOAuthValid = !isOAuthConfigured || (
     (smtp.oauth_tenant_id?.trim()?.length > 0) &&
     (smtp.oauth_client_id?.trim()?.length > 0) &&
-    ((smtp.oauth_client_secret?.trim()?.length > 0) || smtp.has_client_secret) &&
     (smtp.oauth_user?.trim()?.length > 0)
   );
+  const canSaveGraph = smtp.use_graph_email ? (
+    (smtp.graph_tenant_id?.trim()?.length > 0) &&
+    (smtp.graph_client_id?.trim()?.length > 0) &&
+    ((smtp.graph_client_secret?.trim()?.length > 0) || smtp.has_graph_client_secret) &&
+    (smtp.graph_user?.trim()?.length > 0)
+  ) : true;
 
   useEffect(() => {
     apiRequest('/branding', 'GET').then(res => {
@@ -224,8 +238,8 @@ export default function BrandingPage() {
   <button onClick={() => handleUpload('icon', iconFile)} style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px', marginTop: '8px'}}>Upload Icon</button>
       </div>
       <div style={{marginBottom:'2em'}}>
-        <h3>SMTP Settings</h3>
-        <p style={{fontSize:'0.9em'}}>Configure how emails are sent for invite links.</p>
+        <h3>Email Settings</h3>
+        <p style={{fontSize:'0.9em'}}>Configure how emails are sent for invite links. You can use Microsoft Graph (app-only) or SMTP (basic/delegated OAuth).</p>
         <div style={{
           marginBottom: '16px',
           border: `2px solid ${branding?.box_border_color || '#007bff'}`,
@@ -234,35 +248,86 @@ export default function BrandingPage() {
           padding: '16px',
           background: branding?.box_bg_color || '#f8faff',
         }}>
+          <label style={{display:'block', marginBottom:'8px'}}>Use Microsoft Graph (recommended for app-only)
+            <input type="checkbox" style={{marginLeft:'8px'}} checked={!!smtp.use_graph_email} onChange={e => setSmtp(v => ({ ...v, use_graph_email: e.target.checked }))} />
+          </label>
+          {smtp.use_graph_email && (
+            <div style={{borderTop:'1px dashed #ccc', paddingTop:'10px', marginTop:'10px'}}>
+              <div style={{fontWeight:'bold', marginBottom:'6px'}}>Graph Settings</div>
+              <div style={{fontSize:'0.85em', opacity:0.8, marginBottom:'6px'}}>Requires an Azure AD app with Application permission Mail.Send (admin consent). Emails are sent as the user below.</div>
+              <label>Tenant ID <input value={smtp.graph_tenant_id || ''} onChange={e => setSmtp(v => ({ ...v, graph_tenant_id: e.target.value }))} /></label><br />
+              <label>Client ID <input value={smtp.graph_client_id || ''} onChange={e => setSmtp(v => ({ ...v, graph_client_id: e.target.value }))} /></label><br />
+              <label>Client Secret <input type="password" value={smtp.graph_client_secret || ''} placeholder={smtp.has_graph_client_secret ? '•••••• (set)' : ''} onChange={e => setSmtp(v => ({ ...v, graph_client_secret: e.target.value }))} /></label>{' '}
+              {smtp.has_graph_client_secret && (
+                <label style={{marginLeft:'8px'}}><input type="checkbox" onChange={e => setSmtp(v => ({ ...v, clear_graph_client_secret: e.target.checked }))} /> Clear client secret</label>
+              )}
+              <br />
+              <label>Send As (user email) <input value={smtp.graph_user || ''} onChange={e => setSmtp(v => ({ ...v, graph_user: e.target.value }))} placeholder="user@domain.com" /></label><br />
+              <label>Authority <input value={smtp.graph_authority || ''} onChange={e => setSmtp(v => ({ ...v, graph_authority: e.target.value }))} placeholder="https://login.microsoftonline.com" /></label>
+            </div>
+          )}
           <label style={{display:'block', marginBottom:'8px'}}>Use OAuth (Exchange Online)
             <input type="checkbox" style={{marginLeft:'8px'}} checked={!!smtp.oauth_enabled} onChange={e => setSmtp(v => ({ ...v, oauth_enabled: e.target.checked }))} />
           </label>
-          <label>SMTP URL <input placeholder="smtp://user:pass@host:port" value={smtp.smtp_url || ''} disabled={smtp.oauth_enabled} onChange={e => setSmtp(v => ({ ...v, smtp_url: e.target.value }))} style={{width:'100%'}} /></label><br />
+          <label>SMTP URL <input placeholder="smtp://user:pass@host:port" value={smtp.smtp_url || ''} disabled={smtp.oauth_enabled || smtp.use_graph_email} onChange={e => setSmtp(v => ({ ...v, smtp_url: e.target.value }))} style={{width:'100%'}} /></label><br />
           <div style={{opacity:0.7, fontSize:'0.85em', margin:'6px 0'}}>Or specify individual fields below (host/port/secure/user/password)</div>
-          <label>Host <input value={smtp.smtp_host || ''} disabled={smtp.oauth_enabled} onChange={e => setSmtp(v => ({ ...v, smtp_host: e.target.value }))} /></label>{' '}
-          <label>Port <input type="number" value={smtp.smtp_port || ''} disabled={smtp.oauth_enabled} onChange={e => setSmtp(v => ({ ...v, smtp_port: e.target.value }))} style={{width:100}} /></label>{' '}
-          <label><input type="checkbox" checked={!!smtp.smtp_secure} disabled={smtp.oauth_enabled} onChange={e => setSmtp(v => ({ ...v, smtp_secure: e.target.checked }))} /> Use TLS (secure)</label><br />
-          <label>Username <input value={smtp.smtp_user || ''} disabled={smtp.oauth_enabled} onChange={e => setSmtp(v => ({ ...v, smtp_user: e.target.value }))} /></label><br />
-          <label>Password <input type="password" value={smtp.smtp_pass || ''} disabled={smtp.oauth_enabled} placeholder={smtp.has_password ? '•••••• (set)' : ''} onChange={e => setSmtp(v => ({ ...v, smtp_pass: e.target.value }))} /></label>{' '}
+          <label>Host <input value={smtp.smtp_host || ''} disabled={smtp.oauth_enabled || smtp.use_graph_email} onChange={e => setSmtp(v => ({ ...v, smtp_host: e.target.value }))} /></label>{' '}
+          <label>Port <input type="number" value={smtp.smtp_port || ''} disabled={smtp.oauth_enabled || smtp.use_graph_email} onChange={e => setSmtp(v => ({ ...v, smtp_port: e.target.value }))} style={{width:100}} /></label>{' '}
+          <label><input type="checkbox" checked={!!smtp.smtp_secure} disabled={smtp.oauth_enabled || smtp.use_graph_email} onChange={e => setSmtp(v => ({ ...v, smtp_secure: e.target.checked }))} /> Use TLS (secure)</label><br />
+          <label>Username <input value={smtp.smtp_user || ''} disabled={smtp.oauth_enabled || smtp.use_graph_email} onChange={e => setSmtp(v => ({ ...v, smtp_user: e.target.value }))} /></label><br />
+          <label>Password <input type="password" value={smtp.smtp_pass || ''} disabled={smtp.oauth_enabled || smtp.use_graph_email} placeholder={smtp.has_password ? '•••••• (set)' : ''} onChange={e => setSmtp(v => ({ ...v, smtp_pass: e.target.value }))} /></label>{' '}
           {!smtp.oauth_enabled && smtp.has_password && (
             <label style={{marginLeft:'8px'}}><input type="checkbox" onChange={e => setSmtp(v => ({ ...v, clear_password: e.target.checked }))} /> Clear saved password</label>
           )}
           <br />
           {smtp.oauth_enabled && (
             <div style={{borderTop:'1px dashed #ccc', paddingTop:'10px', marginTop:'10px'}}>
-              <div style={{fontWeight:'bold', marginBottom:'6px'}}>OAuth (Exchange Online)</div>
-              <div style={{fontSize:'0.85em', opacity:0.8, marginBottom:'6px'}}>Provide your Azure AD app credentials (client credentials flow). The mailbox in "OAuth User" must be accessible to the app. Default scope is outlook.office365.com/.default.</div>
+              <div style={{fontWeight:'bold', marginBottom:'6px'}}>SMTP OAuth (Exchange Online)</div>
+              <div style={{fontSize:'0.85em', opacity:0.8, marginBottom:'6px'}}>For SMTP, use delegated mode (device code sign-in). App-only does not work with SMTP AUTH. If you prefer app-only, use Microsoft Graph above.</div>
+              <label>Mode
+                <select value={smtp.oauth_mode || 'delegated'} onChange={e => setSmtp(v => ({ ...v, oauth_mode: e.target.value }))} style={{marginLeft:'8px'}}>
+                  <option value="delegated">Delegated (device code)</option>
+                  <option value="client-credentials">Client Credentials (not supported for SMTP)</option>
+                </select>
+              </label>
+              <br />
               <label>Tenant ID <input value={smtp.oauth_tenant_id || ''} onChange={e => setSmtp(v => ({ ...v, oauth_tenant_id: e.target.value }))} /></label><br />
               <label>Client ID <input value={smtp.oauth_client_id || ''} onChange={e => setSmtp(v => ({ ...v, oauth_client_id: e.target.value }))} /></label><br />
-              <label>Client Secret <input type="password" value={smtp.oauth_client_secret || ''} placeholder={smtp.has_client_secret ? '•••••• (set)' : ''} onChange={e => setSmtp(v => ({ ...v, oauth_client_secret: e.target.value }))} /></label>{' '}
-              {smtp.has_client_secret && (
-                <label style={{marginLeft:'8px'}}><input type="checkbox" onChange={e => setSmtp(v => ({ ...v, clear_client_secret: e.target.checked }))} /> Clear client secret</label>
+              {smtp.oauth_mode !== 'delegated' && (
+                <>
+                  <label>Client Secret <input type="password" value={smtp.oauth_client_secret || ''} placeholder={smtp.has_client_secret ? '•••••• (set)' : ''} onChange={e => setSmtp(v => ({ ...v, oauth_client_secret: e.target.value }))} /></label>{' '}
+                  {smtp.has_client_secret && (
+                    <label style={{marginLeft:'8px'}}><input type="checkbox" onChange={e => setSmtp(v => ({ ...v, clear_client_secret: e.target.checked }))} /> Clear client secret</label>
+                  )}
+                  <br />
+                </>
               )}
-              <br />
               <label>OAuth User (email) <input value={smtp.oauth_user || ''} onChange={e => setSmtp(v => ({ ...v, oauth_user: e.target.value }))} placeholder="user@domain.com" /></label><br />
-              <label>Scope <input value={smtp.oauth_scope || ''} onChange={e => setSmtp(v => ({ ...v, oauth_scope: e.target.value }))} placeholder="https://outlook.office365.com/.default" /></label><br />
+              <label>Scope <input value={smtp.oauth_scope || ''} onChange={e => setSmtp(v => ({ ...v, oauth_scope: e.target.value }))} placeholder="https://outlook.office365.com/SMTP.Send offline_access openid profile email" /></label><br />
               <label>Authority <input value={smtp.oauth_authority || ''} onChange={e => setSmtp(v => ({ ...v, oauth_authority: e.target.value }))} placeholder="https://login.microsoftonline.com" /></label>
-              {!isOAuthValid && <div style={{color:'#a94442', marginTop:'6px'}}>To use OAuth, please provide Tenant ID, Client ID, Client Secret (or keep existing), and OAuth User.</div>}
+              {!isOAuthValid && <div style={{color:'#a94442', marginTop:'6px'}}>To use OAuth delegated, please provide Tenant ID, Client ID, and OAuth User. Then start device code sign-in.</div>}
+              <div style={{marginTop:'6px'}}>
+                <button
+                  type="button"
+                  style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px'}}
+                  disabled={!isOAuthValid || smtp.oauth_mode !== 'delegated'}
+                  onClick={async () => {
+                    setError(''); setSuccess('');
+                    const token = localStorage.getItem('token');
+                    const res = await apiRequest('/smtp-settings/oauth/device-code', 'POST', {}, token);
+                    if (res && res.success) {
+                      const info = res.device;
+                      if (info) {
+                        setSuccess(`Device code generated. ${info.message || `Go to ${info.verificationUri} and enter code ${info.userCode}`}`);
+                      } else {
+                        setSuccess('Device code flow started. Follow instructions in the terminal/logs.');
+                      }
+                    } else {
+                      setError(res?.error || 'Failed to start device code flow');
+                    }
+                  }}
+                >Start Device Code Sign-in</button>
+              </div>
             </div>
           )}
           <label>From Email <input value={smtp.from_email || ''} onChange={e => setSmtp(v => ({ ...v, from_email: e.target.value }))} placeholder="no-reply@example.com" /></label>
@@ -270,7 +335,7 @@ export default function BrandingPage() {
             <button
               type="button"
               style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px'}}
-              disabled={smtp.oauth_enabled && !isOAuthValid}
+              disabled={(smtp.oauth_enabled && !isOAuthValid) || !canSaveGraph}
               onClick={async () => {
                 setError(''); setSuccess('');
                 const token = localStorage.getItem('token');
@@ -285,6 +350,7 @@ export default function BrandingPage() {
                   ...(smtp.clear_password ? { clear_password: true } : {}),
                   from_email: smtp.from_email,
                   oauth_enabled: smtp.oauth_enabled,
+                  oauth_mode: smtp.oauth_mode,
                   oauth_tenant_id: smtp.oauth_tenant_id,
                   oauth_client_id: smtp.oauth_client_id,
                   oauth_user: smtp.oauth_user,
@@ -292,6 +358,13 @@ export default function BrandingPage() {
                   oauth_authority: smtp.oauth_authority,
                   ...(smtp.oauth_client_secret ? { oauth_client_secret: smtp.oauth_client_secret } : {}),
                   ...(smtp.clear_client_secret ? { clear_client_secret: true } : {}),
+                  use_graph_email: smtp.use_graph_email,
+                  graph_tenant_id: smtp.graph_tenant_id,
+                  graph_client_id: smtp.graph_client_id,
+                  graph_user: smtp.graph_user,
+                  graph_authority: smtp.graph_authority,
+                  ...(smtp.graph_client_secret ? { graph_client_secret: smtp.graph_client_secret } : {}),
+                  ...(smtp.clear_graph_client_secret ? { clear_graph_client_secret: true } : {}),
                 };
                 const res = await apiRequest('/smtp-settings', 'PUT', payload, token);
                 if (res && !res.error) {
@@ -300,10 +373,13 @@ export default function BrandingPage() {
                     ...v,
                     smtp_pass: '',
                     oauth_client_secret: '',
+                    graph_client_secret: '',
                     has_password: smtp.clear_password ? false : (v.has_password || !!payload.smtp_pass),
                     has_client_secret: smtp.clear_client_secret ? false : (v.has_client_secret || !!payload.oauth_client_secret),
+                    has_graph_client_secret: smtp.clear_graph_client_secret ? false : (v.has_graph_client_secret || !!payload.graph_client_secret),
                     clear_password: false,
                     clear_client_secret: false,
+                    clear_graph_client_secret: false,
                   }));
                 } else {
                   setError(res.error || 'Failed to save SMTP settings');
@@ -321,8 +397,13 @@ export default function BrandingPage() {
                   const token = localStorage.getItem('token');
                   const res = await apiRequest('/smtp-settings/verify-oauth', 'POST', {}, token);
                   if (res && !res.error && res.success) {
-                    const exp = res.expiresOn ? new Date(res.expiresOn) : null;
-                    setSuccess(`OAuth token acquired successfully${exp ? ` (expires ${exp.toLocaleString()})` : ''}.`);
+                    if (res.mode === 'delegated') {
+                      setSuccess(`Delegated OAuth is ready${res.username ? ` for ${res.username}` : ''}.`);
+                    } else if (res.mode === 'graph') {
+                      setSuccess('Graph app-only auth is valid.');
+                    } else {
+                      setSuccess('OAuth verified.');
+                    }
                   } else {
                     const msg = (res && res.error) || 'OAuth verification failed';
                     const det = [res?.details, res?.code, res?.suberror, res?.correlationId].filter(Boolean).join(' | ');
@@ -336,7 +417,7 @@ export default function BrandingPage() {
               <button
                 type="button"
                 style={{background: branding.button_color || '#007bff', color: branding.text_color || '#fff', border: 'none', borderRadius: '4px', padding: '4px 12px'}}
-                disabled={smtp.oauth_enabled && !isOAuthValid}
+                disabled={(smtp.oauth_enabled && !isOAuthValid)}
                 onClick={async () => {
                   setError(''); setSuccess('');
                   if (smtp.oauth_enabled && !isOAuthValid) {
